@@ -1,0 +1,116 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SmartOMR – Hướng dẫn cài đặt</title><style>body{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:#f1f6f9;color:#182e44;margin:0;line-height:1.65}main{max-width:950px;margin:25px auto 60px;padding:26px 38px;border:1px solid #e5eef2;border-radius:20px;background:white;box-shadow:0 8px 40px #09263e0a}h1{font-size:27px;line-height:1.3;color:#103956}h2{font-size:20px;color:#076f77;border-bottom:1px solid #e4edf1;padding-top:10px;padding-bottom:8px}strong{color:#173e55}a{color:#086d95}table{width:100%;border-collapse:collapse}td,th{border:1px solid #e0e8ee;padding:9px 10px;text-align:left}th{background:#e8f6f4}blockquote{border-left:4px solid #df9e45;margin:22px 0;padding:8px 18px;background:#fff9ec}code{background:#f2f5f9;padding:2px 5px;border-radius:4px}li{margin:6px 0}@media(max-width:600px){main{margin:0;padding:18px 15px;border-radius:0;box-shadow:none}h1{font-size:23px}h2{font-size:18px}table{font-size:12px}}@media print{body{background:white}main{box-shadow:none;border:0;margin:0;max-width:100%;padding:0}}</style></head><body><main><div style="text-align:right"><a href="./index.html">Mở ứng dụng SmartOMR →</a></div><h1>HƯỚNG DẪN CÀI ĐẶT VÀ SỬ DỤNG SMARTOMR 1.0</h1>
+<p><strong>Phiên bản:</strong> PWA 1.0 – bản thử nghiệm (06/11/2026)<br />
+<strong>Chức năng:</strong> Chấm phiếu trắc nghiệm trên trình duyệt; hỗ trợ camera điện thoại, cấu hình điểm và đáp án 3 phần, nhận diện số báo danh và gợi ý tên tiếng Việt, tổng hợp điểm trực tiếp.</p>
+<blockquote>
+<p><strong>Quan trọng:</strong> Đây là bản thử nghiệm, chưa được kiểm định độ chính xác chấm thi; phải rà soát các ô tô mờ, kết quả OCR và riêng phần trả lời ngắn. Dữ liệu chỉ lưu trong trình duyệt, chưa đồng bộ Google Sheets.</p>
+</blockquote>
+<h2>1. Thành phần gói cài đặt</h2>
+<ul>
+<li><code>index.html</code>: giao diện ứng dụng (bản triển khai sạch, không có dữ liệu học sinh/đáp án ban đầu).</li>
+<li><code>manifest.webmanifest</code>, <code>sw.js</code>, thư mục <code>icons/</code>: cài lên màn hình chính như ứng dụng PWA, dùng tốt trên điện thoại.</li>
+<li><code>Danh_sach_HS_mau.csv</code>: tệp mẫu để nhập từ Excel.</li>
+<li><code>tai_lieu/Mau_phieu_2018.pdf</code>: phiếu trắc nghiệm tham chiếu (40/8/6 câu).</li>
+<li><code>HUONG_DAN_CAI_DAT.html</code> và <code>HUONG_DAN_CAI_DAT.md</code>: hướng dẫn sử dụng và xử lý lỗi.</li>
+</ul>
+<p>Không cần cài Python, PHP, Node.js hay Google Apps Script để ứng dụng hoạt động. <strong>Tuy nhiên</strong>, muốn dùng camera và cài PWA ổn định, cần tải ứng dụng lên địa chỉ <strong>HTTPS</strong>; OCR tiếng Việt cần Internet để tải Tesseract.js và mô hình ngôn ngữ.</p>
+<h2>2. Cài đặt nhanh bằng GitHub Pages (khuyên dùng)</h2>
+<ol>
+<li>Tải file <code>SmartOMR_CaiDat_DienThoai_v1.0.zip</code>, giải nén trên máy tính.</li>
+<li>Đăng nhập <a href="https://github.com">github.com</a>. Vào <strong>New repository</strong> để tạo kho mới, ví dụ <code>smartomr</code>; với tài khoản GitHub Free chọn kho <strong>Public</strong> để dùng GitHub Pages.</li>
+<li>Vào kho vừa tạo → <strong>Add file → Upload files</strong>; tải lên <strong>các tệp và thư mục trong thư mục đã giải nén</strong> sao cho <code>index.html</code> nằm ngay ở thư mục gốc của kho. Bấm <strong>Commit changes</strong>.</li>
+<li>Vào <strong>Settings → Pages → Build and deployment → Source: Deploy from a branch</strong>. Chọn nhánh <code>main</code>, thư mục <code>/(root)</code> rồi <strong>Save</strong>.</li>
+<li>Khi hệ thống xuất bản xong, truy cập địa chỉ dạng <code>https://TEN-TAI-KHOAN.github.io/smartomr/</code> (thay tên tài khoản và kho thật).</li>
+<li>Trên điện thoại, mở địa chỉ đó bằng Chrome/Safari để cấp quyền camera và cài biểu tượng lên màn hình chính.</li>
+</ol>
+<p><strong>Chú ý bảo mật:</strong> mã nguồn ứng dụng và các tệp bạn tải lên GitHub Pages có thể truy cập công khai. Không tải tệp sao lưu JSON, danh sách học sinh thực, ảnh phiếu đã làm hoặc bảng điểm thực lên kho GitHub.</p>
+<h2>3. Cài qua Vercel (phương án thay thế)</h2>
+<p><strong>Cách thuận tiện:</strong> đưa toàn bộ mã nguồn lên một kho GitHub (như bước 2.1–2.3), vào <a href="https://vercel.com">vercel.com</a> → <strong>Add New / Project</strong> → chọn kho → <strong>Deploy</strong>. Đây là dự án HTML tĩnh, không cần framework. Truy cập URL HTTPS được Vercel cấp.</p>
+<p><strong>Dành cho người biết dòng lệnh:</strong> giải nén, mở terminal trong thư mục chứa <code>index.html</code>, cài CLI bằng <code>npm i -g vercel</code>, đăng nhập và chạy <code>vercel --prod</code> theo hướng dẫn.</p>
+<h2>4. Cài biểu tượng lên màn hình điện thoại</h2>
+<ul>
+<li><strong>Android/Chrome:</strong> mở URL HTTPS ứng dụng, bấm menu <code>⋮</code> rồi chọn <strong>Cài đặt ứng dụng / Install app</strong> hoặc <strong>Thêm vào màn hình chính</strong> (tùy phiên bản trình duyệt).</li>
+<li><strong>iPhone/Safari:</strong> mở URL HTTPS → nút <strong>Chia sẻ</strong> → <strong>Thêm vào Màn hình chính (Add to Home Screen)</strong> → bật <strong>Mở như ứng dụng web (Open as Web App)</strong> nếu hiển thị → <strong>Thêm</strong>.</li>
+<li><strong>Máy tính Chrome/Edge:</strong> mở URL HTTPS → biểu tượng cài ứng dụng ở thanh địa chỉ (nếu có), hoặc từ menu trình duyệt chọn cài ứng dụng/trang web.</li>
+</ul>
+<p>PWA là ứng dụng web được cài biểu tượng, <strong>không phải APK</strong>. Giữ nguyên địa chỉ website sau khi cài để dữ liệu cục bộ không bị tách sang một tên miền khác.</p>
+<h2>5. Thiết lập lần đầu trước khi chấm</h2>
+<ol>
+<li><strong>Danh sách học sinh:</strong> dùng Excel tạo các cột <code>SBD,Họ và tên,Lớp</code> rồi lưu <strong>CSV UTF-8</strong>. SBD 8 chữ số: lưu dưới dạng <strong>Text</strong> để giữ số 0 ở đầu. Vào <strong>Danh sách học sinh → Nhập CSV từ Excel</strong>.</li>
+<li><strong>Cấu hình điểm:</strong> vào <strong>Cấu hình điểm</strong>, đặt số câu của Phần I (không quá 40), Phần II (không quá 8) và Phần III (không quá 6). Đặt điểm cho từng câu, hoặc nhập tổng điểm của phần rồi bấm <strong>Chia đều</strong>. Phần II có bảng hệ số điểm theo số ý đúng (0–4), điều chỉnh nếu cần.</li>
+<li><strong>Đáp án chuẩn:</strong> vào <strong>Đáp án chuẩn</strong>, nhập đáp án Phần I (A–D), Phần II (Đúng/Sai từng ý a–d), Phần III (số, dấu âm, dấu phẩy). Bản triển khai bắt đầu với đáp án trống và <strong>không cho lưu bảng điểm nếu còn đáp án chưa cấu hình</strong>.</li>
+<li><strong>Kiểm tra thang điểm:</strong> mặc định tổng là 10 điểm (4 + 4 + 2) theo phân bổ tham khảo; nếu đổi số câu thì phải kiểm tra lại tổng và điều chỉnh điểm.</li>
+<li><strong>Sao lưu:</strong> sau khi nhập xong danh sách và đáp án, vào <strong>Lịch sử chấm → Sao lưu toàn bộ (.json)</strong> để lưu dự phòng.</li>
+</ol>
+<h2>6. Chấm bài bằng camera</h2>
+<ol>
+<li>Vào <strong>Quét bằng camera</strong> → cho phép camera hoặc bấm <strong>Chụp / tải ảnh</strong>.</li>
+<li>Đặt phiếu phẳng, đầy đủ bốn mốc định vị đen; đủ sáng, không bóng, không che mép.</li>
+<li>Chạm lần lượt <strong>bốn góc</strong> theo hướng dẫn trên màn hình để ứng dụng căn chỉnh ảnh.</li>
+<li>Bấm <strong>Đọc phiếu + tên tiếng Việt</strong>. Ứng dụng thử đọc ô tô, SBD, mã đề và cắt vùng họ tên để OCR.</li>
+<li>Màn hình chuyển đến <strong>Chấm bài và bảng điểm</strong>, hiện <strong>họ tên, SBD, Phần I, II, III và tổng điểm</strong>.</li>
+<li>Kiểm tra các ô mờ/nhiều đáp án, đặc biệt <strong>Phần III phải đối chiếu thủ công</strong>. Nếu chữ viết tay hoặc SBD chưa chắc chắn, chọn học sinh trong danh sách hoặc xác nhận gợi ý.</li>
+<li>Bấm <strong>Lưu &amp; quét tiếp</strong> để chấm phiếu tiếp theo.</li>
+<li>Vào <strong>Lịch sử chấm → Xuất CSV (Excel)</strong> để tải bảng điểm.</li>
+</ol>
+<h3>Nhận diện họ tên tiếng Việt</h3>
+<p>SBD hợp lệ được ưu tiên dùng để tra tên tiếng Việt có dấu từ danh sách nhập trước. OCR chữ viết tay có thể sai dấu, sai chữ, sai họ; <strong>không dùng tên OCR chưa xác nhận làm danh tính chính thức</strong>. Khi OCR và SBD mâu thuẫn, hệ thống yêu cầu xác nhận trước khi lưu.</p>
+<h2>7. Sao lưu, khôi phục và nâng cấp</h2>
+<ul>
+<li><strong>Sao lưu:</strong> vào <strong>Lịch sử chấm</strong> → <strong>Sao lưu toàn bộ (.json)</strong>. Tệp có đầy đủ danh sách, đáp án, cấu hình điểm và lịch sử, có <strong>thông tin học sinh</strong>, vì vậy cần lưu riêng, không chia sẻ công khai.</li>
+<li><strong>Khôi phục:</strong> vào <strong>Lịch sử chấm</strong> → <strong>Khôi phục từ tệp JSON</strong>; chọn tệp đã sao lưu. Hệ thống yêu cầu xác nhận vì thao tác này <strong>ghi đè toàn bộ dữ liệu hiện tại trong trình duyệt</strong>.</li>
+<li><strong>Cập nhật phiên bản:</strong> thay mới mã nguồn tại <strong>chính URL/domain đang dùng</strong>; xuất sao lưu JSON trước, tải lại trang để lấy phiên bản mới. Không xóa dữ liệu trang web hoặc đổi trình duyệt/hồ sơ người dùng khi chưa sao lưu.</li>
+<li><strong>Đổi điện thoại:</strong> lưu JSON trên điện thoại cũ → mở cùng URL ứng dụng trên điện thoại mới → nhập tệp JSON vào mục Khôi phục.</li>
+</ul>
+<h2>8. Cách xử lý lỗi thường gặp</h2>
+<table>
+<thead>
+<tr>
+  <th>Vấn đề</th>
+  <th>Cách xử lý</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Không mở được camera</td>
+  <td>Dùng địa chỉ HTTPS, cho phép Camera trong quyền trang web, thử Chrome/Safari mới nhất. Có thể dùng nút Chụp/tải ảnh thay thế.</td>
+</tr>
+<tr>
+  <td>Không có nút Cài ứng dụng</td>
+  <td>Kiểm tra URL HTTPS, dùng Chrome trên Android hoặc Safari trên iPhone; thử thêm vào Màn hình chính.</td>
+</tr>
+<tr>
+  <td>Ứng dụng không xuất hiện sau khi tải GitHub</td>
+  <td>Đảm bảo <code>index.html</code> ở gốc kho, Settings → Pages đang chọn main và /(root), chờ triển khai hoàn tất.</td>
+</tr>
+<tr>
+  <td>OCR không nhận tiếng Việt</td>
+  <td>Kiểm tra Internet (tải thư viện/mô hình qua CDN); chụp đủ sáng, không nhòe; thử chọn tên từ danh sách.</td>
+</tr>
+<tr>
+  <td>Tên không khớp</td>
+  <td>So lại SBD 8 số và danh sách CSV; OCR chữ viết tay chỉ là gợi ý, không tự quyết định.</td>
+</tr>
+<tr>
+  <td>Điểm bằng 0 hoặc không lưu được</td>
+  <td>Kiểm tra đáp án chuẩn có đủ chưa, số câu/thang điểm và câu trống; kết quả camera chỉ tạm tính trước xác nhận.</td>
+</tr>
+<tr>
+  <td>Không thấy dữ liệu trên máy khác</td>
+  <td>Phiên bản này <strong>không có máy chủ đồng bộ</strong>; phải xuất JSON và khôi phục thủ công.</td>
+</tr>
+<tr>
+  <td>Không thấy tệp CSV/JSON đã tải</td>
+  <td>Kiểm tra thư mục Downloads/Tệp trên điện thoại hoặc quyền tải xuống của trình duyệt.</td>
+</tr>
+</tbody>
+</table>
+<h2>9. Giới hạn an toàn</h2>
+<ul>
+<li>Bản 1.0 là <strong>bản thử nghiệm</strong>, không khuyến nghị dùng để quyết định điểm thi chính thức trước khi kiểm định với nhiều phiếu thực tế.</li>
+<li>Mẫu hỗ trợ tối đa 40 câu Phần I, 8 câu Phần II và 6 câu Phần III; thay đổi vị trí ô/tỉ lệ phiếu có thể khiến thuật toán nhận sai.</li>
+<li>Nhận dạng chữ viết tay tiếng Việt của Tesseract không đảm bảo chính xác; phần III chưa nhận tự động đầy đủ.</li>
+<li>Dữ liệu được lưu bằng <strong>localStorage</strong> trên chính thiết bị/trình duyệt; không có tài khoản đăng nhập, phân quyền, máy chủ, đồng bộ Google Sheets hay mã hóa dữ liệu ứng dụng. Không dùng trên thiết bị công cộng khi chứa dữ liệu học sinh thật.</li>
+<li>PWA có thể mở giao diện khi mạng yếu nhờ bộ nhớ đệm, nhưng OCR tiếng Việt có thể <strong>không hoạt động ngoại tuyến</strong> vì tải thư viện/mô hình từ Internet.</li>
+</ul>
+<p><strong>Liên kết tham khảo:</strong> <a href="https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site">https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site</a> ; <a href="https://vercel.com/docs/deployments">https://vercel.com/docs/deployments</a> ; <a href="https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/27/ios/27">https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/27/ios/27</a> ; <a href="https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable">https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable</a></p>
+</main></body></html>
