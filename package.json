@@ -1,0 +1,13 @@
+{
+  "name": "smartomr-google-sheets",
+  "version": "2.2.0",
+  "private": true,
+  "type": "module",
+  "description": "SmartOMR frontend camera + Vercel serverless proxy + Google Apps Script + Google Sheets",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -29,14 +29,54 @@
 .ocr-status{font-size:12px;color:#4a6780;margin-top:4px}
 .ocr-raw{font-size:16px;font-weight:750;color:#17304a;overflow-wrap:anywhere}
 .ocr-status.error{color:#ab454b}
+
+/* Chế độ Google Sheets: màn hình đăng nhập và trạng thái đồng bộ */
+.cloud-login{position:fixed;inset:0;z-index:999;background:linear-gradient(130deg,#10213e,#176b73);display:grid;place-items:center;padding:18px}
+.cloud-login.hidden{display:none!important}
+.cloud-login-panel{background:#fff;width:min(440px,100%);padding:28px;border-radius:22px;box-shadow:0 24px 60px #0004}
+.cloud-login-panel h1{font-size:26px;margin:6px 0 5px;color:#142a3c}
+.cloud-login-panel p{margin:0 0 20px;color:#657587}
+.cloud-login-panel input{margin-bottom:13px}
+.cloud-busy{pointer-events:none;opacity:.55}
+.cloud-top{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin:12px 0 0}
+.cloud-status{font-size:12px;font-weight:700;color:#21546a;border:1px solid #d5e6ed;background:#eff9fb;border-radius:11px;padding:8px 11px}
+.cloud-status.error{color:#a02f3d;background:#fff1f0;border-color:#eebdbd}
+.config-exam{display:grid;grid-template-columns:minmax(135px,1fr) minmax(190px,2fr);gap:12px}
+@media(max-width:650px){.cloud-login-panel{padding:22px}.config-exam{grid-template-columns:1fr}}
+
+/* Nhận dạng tự động: 4 mốc đen và tiến độ quét trực tiếp trên video */
+.overlay-stage{display:flex;justify-content:center;width:100%}.overlay-stage canvas{width:auto!important;height:auto!important;max-width:100%;max-height:560px;object-fit:contain}
+.live-video{display:block;width:100%;max-height:560px;object-fit:contain}
+.live-overlay{position:absolute;inset:0;width:100%!important;height:100%!important;max-height:none!important;pointer-events:none;object-fit:fill!important}
+.live-instruction{margin-top:9px;font-weight:700;font-size:12px;color:#245e72}
+.live-instruction.ok{color:#087b56}
+@media(max-width:700px){.cam-box{min-height:340px}}
 </style>
 </head>
 <body>
-<div class="shell"><header class="header"><div class="brand"><div class="logo">◉</div><div><div class="head-title">Smart<span style="color:#65e2d2">OMR</span> <span style="font-size:12px;color:#bceee9;vertical-align:middle">DEMO</span></div><div class="head-desc">Quét SBD • Tự tìm họ tên • Hiển thị điểm 3 phần</div></div></div><div class="head-tags"><span class="tag">📱 Tối ưu điện thoại</span><span class="tag">✓ Chấm theo điểm từng câu</span></div></header>
-<div class="layout"><aside class="sidebar" id="navigation"></aside><main class="content" id="screen"></main></div><p class="footnote">SmartOMR 1.0 – Bản thử nghiệm. Dữ liệu chỉ lưu trong trình duyệt trên thiết bị này, chưa đồng bộ Google Sheets. Sao lưu trước khi đổi điện thoại hoặc xóa dữ liệu trình duyệt.</p></div>
+<div class="shell"><header class="header"><div class="brand"><div class="logo">◉</div><div><div class="head-title">Smart<span style="color:#65e2d2">OMR</span> <span style="font-size:12px;color:#bceee9;vertical-align:middle">SHEETS 2.2</span></div><div class="head-desc">Quét phiếu • Nhận tên tiếng Việt • Lưu điểm lên Google Sheets</div></div></div><div class="head-tags"><span class="tag">📱 Tối ưu điện thoại</span><span class="tag">✓ Chấm theo điểm từng câu</span></div></header>
+<div class="cloud-top"><span class="cloud-status" id="cloud-status">Đang kết nối Google Sheets…</span><span id="cloud-exam" class="small muted"></span><button class="btn sm" id="cloud-refresh">↻ Tải lại Sheets</button><button class="btn sm" id="cloud-logout">Đăng xuất</button></div><div class="layout"><aside class="sidebar" id="navigation"></aside><main class="content" id="screen"></main></div><p class="footnote">SmartOMR 2.1 – Google Sheets là nguồn dữ liệu chính. Camera/OCR và phần III cần giáo viên đối chiếu; tuyệt đối không dùng chấm thi chính thức khi chưa hiệu chuẩn bằng phiếu thực tế.</p></div>
 <div id="toast" class="toast"></div>
+<div id="cloud-login" class="cloud-login">
+ <form id="cloud-login-form" class="cloud-login-panel">
+  <div style="font-size:36px">◉</div><h1>SmartOMR · Google Sheets</h1>
+  <p>Đăng nhập bằng mã PIN đã đặt trong Google Apps Script. Dữ liệu được lưu trên Google Sheets.</p>
+  <label class="label" for="cloud-pin">Mã PIN truy cập</label>
+  <input class="field" id="cloud-pin" type="password" autocomplete="current-password" minlength="6" required placeholder="Nhập mã PIN">
+  <label class="label" for="cloud-grader">Tên giáo viên chấm (ghi vào bảng điểm)</label>
+  <input class="field" id="cloud-grader" type="text" maxlength="90" value="Giáo viên" required placeholder="Họ tên giáo viên">
+  <button class="btn primary" style="width:100%" type="submit">Đăng nhập và tải dữ liệu</button>
+  <p id="cloud-login-error" style="margin:14px 0 0;color:#b73c46;font-size:13px"></p>
+  <p style="font-size:12px;margin-top:18px">Cần Internet. Không nhập mã bí mật BRIDGE_SECRET tại đây.</p>
+ </form>
+</div>
+<script src="./js/omr-auto.js"></script>
 <script>
 (function(){'use strict';
+const store=(()=>{
+  try{const s=window.sessionStorage;const key='smartomr_storage_probe';s.setItem(key,'1');s.removeItem(key);return s;}
+  catch(e){const m=new Map();return {getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k)};}
+})();
 const maxima={one:40,two:8,three:6}, names={one:'Phần I',two:'Phần II',three:'Phần III'}, defaults={one:40,two:8,three:6};
 const makeKeys=(n,type)=>Array.from({length:n},(_,i)=>type==='one'?'ABCD'[i%4]:type==='two'?['Đ','S','Đ','S']:['2','-1,5','0,75','12','4,5','10'][i%6]);
 const seed={counts:{...defaults},weights:{one:Array(40).fill(.1),two:Array(8).fill(.5),three:Array(6).fill(1/3)},keys:{one:makeKeys(40,'one'),two:makeKeys(8,'two'),three:makeKeys(6,'three')},scoreScale:[0,0,.25,.5,1],student:{name:'Nguyễn Văn An',sbd:'01234567',code:'101'},responses:{one:Array.from({length:40},(_,i)=>i%7===0?'':i%5===0?'A':'ABCD'[i%4]),two:Array.from({length:8},(_,i)=>i%3===0?['Đ','Đ','Đ','S']:['Đ','S','Đ','S']),three:['2','-1,5','0,5','12','4','10']},history:[],roster:[{sbd:'01234567',name:'Nguyễn Văn An',lop:'9A'},{sbd:'12345678',name:'Trần Minh Đức',lop:'9B'},{sbd:'87654321',name:'Lò Thị Hoa',lop:'9C'}]};
@@ -45,13 +85,116 @@ const cleanStart={...structuredClone(seed),
  responses:{one:Array(40).fill(''),two:Array.from({length:8},()=>['','','','']),three:Array(6).fill('')},
  keys:{one:Array(40).fill(''),two:Array.from({length:8},()=>['','','','']),three:Array(6).fill('')},
  history:[],roster:[]};
-let data;try{const cached=JSON.parse(localStorage.getItem('smartomr_pwa_v1'));data=cached&&cached.counts&&cached.keys&&cached.weights?cached:structuredClone(cleanStart)}catch(e){data=structuredClone(cleanStart)}
+const newPaperId=()=>('P'+(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)).replace(/[^A-Za-z0-9_-]/g,''));
+let data=structuredClone(cleanStart);data.paperId=newPaperId();data.examId='DE-001';data.examName='Bài kiểm tra số 1';data.activeCode='0101';data.keysByCode={};
 if(!Array.isArray(data.roster))data.roster=[];
 let tab='grade',section='one',gradeSection='one',keySection='one',camStream=null,photo=null,ctxImg=null,camPts=[],camRead=null;
 let ocrState={status:'',raw:'',confidence:0,candidates:[],preview:'',note:''};
 let ocrWorkerPromise=null,ocrScriptPromise=null,scanToken=0;
+let autoCamTimer=null,autoCamBusy=false,autoStable=0,autoLastPoints=null,autoCaptureBusy=false,torchEnabled=false;
 
-function save(){try{localStorage.setItem('smartomr_pwa_v1',JSON.stringify(data))}catch(e){}}
+function save(){
+  data.keysByCode[data.activeCode]=structuredClone(data.keys);
+  try{store.setItem('smartomr_cloud_draft_v2',JSON.stringify({student:data.student,responses:data.responses,code:data.activeCode,examId:data.examId,paperId:data.paperId}));}catch(e){}
+}
+// API Cùng miền trên Vercel -> API Google Apps Script. Mọi hành động ghi phải đợi Sheets xác nhận.
+let cloudSession=store.getItem('smartomr_cloud_token_v2')||'';
+let cloudReady=false, cloudBusy=false;
+let graderName=store.getItem('smartomr_grader_v2')||'Giáo viên';
+function dirtyCloud(item){cloudStatus('⚠ '+item+' chưa lưu lên Google Sheets',true)}
+function cloudStatus(text,isError=false){const e=document.getElementById('cloud-status');if(e){e.textContent=text;e.classList.toggle('error',isError)}}
+async function api(action,payload={}){
+  let response;
+  try{response=await fetch('/api/bridge',{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({action,payload,session:cloudSession,...(action==='login'?{pin:payload.pin}:{})})});}
+  catch(e){throw Error('Không thể kết nối Vercel/Google Sheets. Hãy kiểm tra mạng.');}
+  let out;try{out=await response.json();}catch(e){throw Error('Máy chủ trả dữ liệu không hợp lệ. Kiểm tra phần Vercel API.');}
+  if(!out.ok){
+    if(out.code==='UNAUTHORIZED'){cloudSession='';cloudReady=false;store.removeItem('smartomr_cloud_token_v2');document.getElementById('cloud-login')?.classList.remove('hidden');}
+    const er=new Error(out.error||'Lỗi Google Sheets');er.code=out.code||'API_ERROR';throw er;
+  }
+  return out.data;
+}
+function emptyKeys(){return {one:Array(maxima.one).fill(''),two:Array.from({length:maxima.two},()=>['','','','']),three:Array(maxima.three).fill('')};}
+function codes(){return Object.keys(data.keysByCode).filter(k=>/^\d{4}$/.test(k)).sort();}
+function setActiveCode(code){
+  if(!/^\d{4}$/.test(code))throw Error('Mã đề phải đúng 4 chữ số, ví dụ 0101.');
+  data.keysByCode[data.activeCode]=structuredClone(data.keys);
+  data.activeCode=code;data.keys=structuredClone(data.keysByCode[code]||emptyKeys());
+  data.student.code=code;save();
+}
+async function bootstrapCloud(){
+  const pack=await api('bootstrap');
+  const cfg=pack.config;
+  data=structuredClone(cleanStart);data.paperId=newPaperId();
+  data.examId=cfg.examId;data.examName=cfg.examName;data.counts=cfg.counts;data.weights=cfg.weights;data.scoreScale=cfg.scoreScale;
+  data.roster=pack.roster||[];data.history=pack.history||[];
+  data.keysByCode=pack.keysByCode||{};
+  data.activeCode=codes()[0]||'0101';data.keys=structuredClone(data.keysByCode[data.activeCode]||emptyKeys());
+  data.student={name:'',sbd:'',code:data.activeCode,lop:''};data.responses=emptyResponses();
+  try{
+    const draft=JSON.parse(store.getItem('smartomr_cloud_draft_v2')||'null');
+    if(draft&&draft.examId===data.examId&&draft.responses&&draft.student){
+      const student=data.roster.find(r=>r.sbd===draft.student.sbd);
+      data.responses=draft.responses;data.paperId=draft.paperId||newPaperId();
+      data.student=student?{...draft.student,name:student.name,lop:student.lop}:draft.student;
+      if(draft.code&&data.keysByCode[draft.code])setActiveCode(draft.code);
+    }
+  }catch(e){}
+  cloudReady=true;document.getElementById('cloud-login').classList.add('hidden');
+  document.getElementById('cloud-exam').textContent=data.examName+' • '+data.examId;
+  cloudStatus('● Đã kết nối Google Sheets');render();
+}
+async function initCloud(){
+  const input=document.getElementById('cloud-grader');if(input)input.value=graderName;
+  if(!cloudSession){cloudStatus('Chưa đăng nhập');return;}
+  try{await bootstrapCloud();}catch(e){cloudSession='';cloudReady=false;store.removeItem('smartomr_cloud_token_v2');cloudStatus(e.message,true);document.getElementById('cloud-login').classList.remove('hidden');}
+}
+async function cloudLogin(evt){
+  evt.preventDefault();const form=evt.currentTarget,notice=document.getElementById('cloud-login-error');notice.textContent='';form.classList.add('cloud-busy');
+  try{
+    const pin=document.getElementById('cloud-pin').value;
+    graderName=document.getElementById('cloud-grader').value.trim()||'Giáo viên';
+    const result=await api('login',{pin});cloudSession=result.session;
+    store.setItem('smartomr_cloud_token_v2',cloudSession);
+    store.setItem('smartomr_grader_v2',graderName);
+    document.getElementById('cloud-pin').value='';await bootstrapCloud();
+  }catch(e){notice.textContent=e.message;cloudStatus(e.message,true);}finally{form.classList.remove('cloud-busy');}
+}
+async function cloudLogout(){
+  try{await api('logout')}catch(e){}
+  cloudSession='';cloudReady=false;store.removeItem('smartomr_cloud_token_v2');
+  stopCam();data=structuredClone(cleanStart);data.paperId=newPaperId();data.examId='DE-001';data.activeCode='0101';data.keysByCode={};
+  document.getElementById('cloud-login').classList.remove('hidden');cloudStatus('Đã đăng xuất');render();
+}
+function configPayload(){return {examId:data.examId,examName:data.examName,counts:data.counts,weights:data.weights,scoreScale:data.scoreScale};}
+async function cloudSaveConfig(){
+  const id=(document.getElementById('exam-id')?.value||data.examId).trim();
+  const name=(document.getElementById('exam-name')?.value||data.examName).trim();
+  cloudStatus('Đang lưu cấu hình lên Sheets...');
+  const wasExam=data.examId;
+  const saved=await api('saveConfig',{config:{...configPayload(),examId:id,examName:name}});
+  data.examId=saved.config.examId;data.examName=saved.config.examName;
+  if(wasExam!==data.examId){store.removeItem('smartomr_cloud_draft_v2');await bootstrapCloud();}
+  else{document.getElementById('cloud-exam').textContent=data.examName+' • '+data.examId;cloudStatus('✓ Đã lưu cấu hình vào Sheets');render();}
+  toast('Đã lưu cấu hình lên Google Sheets');
+}
+async function cloudSaveKeys(){
+  save();cloudStatus('Đang lưu đáp án lên Sheets...');
+  await api('saveKeys',{examId:data.examId,code:data.activeCode,keys:data.keys});
+  data.keysByCode[data.activeCode]=structuredClone(data.keys);
+  cloudStatus('✓ Đã lưu đáp án mã '+data.activeCode);
+  toast('Đã lưu đáp án mã đề '+data.activeCode+' lên Sheets');
+}
+async function cloudSaveRoster(){
+  cloudStatus('Đang lưu '+data.roster.length+' học sinh...');
+  const a=await api('saveRoster',{roster:data.roster});
+  cloudStatus('✓ Đã đồng bộ '+a.count+' học sinh');toast('Đã lưu '+a.count+' học sinh lên Google Sheets');
+}
+async function cloudRefresh(){
+  if(!confirm('Tải lại từ Google Sheets sẽ bỏ các thay đổi cấu hình, đáp án hoặc danh sách chưa nhấn “Lưu lên Sheets”. Tiếp tục?'))return;
+  await bootstrapCloud();toast('Đã nạp lại dữ liệu từ Google Sheets');
+}
+function codePicker(current){return (!codes().includes(current)?'<option value="">— Chọn mã đề để chấm —</option>':'')+codes().map(c=>`<option value="${c}" ${c===current?'selected':''}>${c}</option>`).join('');}
 function esc(t){return String(t===undefined||t===null?'':t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function fmt(v,dp=2){return Number(v||0).toLocaleString('vi-VN',{minimumFractionDigits:dp,maximumFractionDigits:dp})}
 function num(v){const x=Number(String(v).replace(',','.'));return Number.isFinite(x)?x:0}
@@ -64,9 +207,9 @@ function toast(t){const x=document.getElementById('toast');x.textContent=t;x.cla
 function nav(){const items=[['grade','📊','Chấm bài & kết quả'],['config','⚙️','Cấu hình điểm'],['keys','🗝️','Đáp án chuẩn'],['camera','📷','Quét bằng camera'],['students','👥','Danh sách học sinh'],['history','📁','Lịch sử chấm']];document.getElementById('navigation').innerHTML='<div class="side-label">ỨNG DỤNG</div>'+items.map(([id,ico,label])=>`<button class="nav ${tab===id?'active':''}" data-tab="${id}"><span class="ico">${ico}</span><span>${label}</span></button>`).join('')}
 function header(title,sub,right=''){return `<div class="page-intro"><div><h1>${title}</h1><p>${sub}</p></div>${right}</div>`}
 function render(){nav();if(tab==='grade')screenGrade();else if(tab==='config')screenConfig();else if(tab==='keys')screenKeys();else if(tab==='camera')screenCamera();else if(tab==='students')screenStudents();else screenHistory();}
-function summary(g){return `<div class="score-banner"><div><div class="small" style="color:#8bddda;font-weight:800;text-transform:uppercase;letter-spacing:1px">KẾT QUẢ CHẤM TRỰC TIẾP</div><div id="summary-name" class="student-name" style="margin-top:6px">${esc(data.student.name||'Chưa xác định học sinh')}</div><div class="sub">SBD: <span id="summary-sbd">${esc(data.student.sbd||'—')}</span> &nbsp; • &nbsp; Mã đề: <span id="summary-code">${esc(data.student.code||'—')}</span></div></div><div style="text-align:right"><div class="small" style="color:#b3dbe1;font-weight:700">TỔNG ĐIỂM</div><div class="score-total"><span id="grand-score">${fmt(g.total)}</span><small> / <span id="grand-max">${fmt(g.max)}</span></small></div></div></div><div class="score-parts" id="part-scores">${summaryParts(g)}</div>`}
+function summary(g){return `<div class="score-banner"><div><div class="small" style="color:#8bddda;font-weight:800;text-transform:uppercase;letter-spacing:1px">KẾT QUẢ CHẤM TRỰC TIẾP</div><div id="summary-name" class="student-name" style="margin-top:6px">${esc(data.student.name||'Phiếu chưa gắn tên (vẫn được chấm)')}</div><div class="sub">SBD: <span id="summary-sbd">${esc(data.student.sbd||'—')}</span> &nbsp; • &nbsp; Mã đề: <span id="summary-code">${esc(data.student.code||'—')}</span></div></div><div style="text-align:right"><div class="small" style="color:#b3dbe1;font-weight:700">TỔNG ĐIỂM</div><div class="score-total"><span id="grand-score">${fmt(g.total)}</span><small> / <span id="grand-max">${fmt(g.max)}</span></small></div></div></div><div class="score-parts" id="part-scores">${summaryParts(g)}</div>`}
 function summaryParts(g){return ['one','two','three'].map((p,i)=>`<div class="score-part"><div class="row between" style="gap:2px"><span class="small muted" style="font-weight:750">PHẦN ${['I','II','III'][i]}</span><span class="small muted">${data.counts[p]} câu</span></div><div style="margin-top:5px"><b>${fmt(g[p].earned)}</b> <span class="meta">/ ${fmt(g[p].max)} điểm</span></div><div class="meter"><i style="width:${g[p].max>0?Math.min(100,100*g[p].earned/g[p].max):0}%"></i></div></div>`).join('')}
-function updateSummary(){const g=grading(),el=document.getElementById('part-scores');if(!el)return;document.getElementById('summary-name').textContent=data.student.name||'Chưa xác định học sinh';document.getElementById('summary-sbd').textContent=data.student.sbd||'—';document.getElementById('summary-code').textContent=data.student.code||'—';document.getElementById('grand-score').textContent=fmt(g.total);document.getElementById('grand-max').textContent=fmt(g.max);el.innerHTML=summaryParts(g);const d=document.getElementById('status-grade');if(d)d.innerHTML=statsLine(g)}
+function updateSummary(){const g=grading(),el=document.getElementById('part-scores');if(!el)return;document.getElementById('summary-name').textContent=data.student.name||'Phiếu chưa gắn tên (vẫn được chấm)';document.getElementById('summary-sbd').textContent=data.student.sbd||'—';document.getElementById('summary-code').textContent=data.student.code||'—';document.getElementById('grand-score').textContent=fmt(g.total);document.getElementById('grand-max').textContent=fmt(g.max);el.innerHTML=summaryParts(g);const d=document.getElementById('status-grade');if(d)d.innerHTML=statsLine(g)}
 function statsLine(g){const done=['one','two','three'].reduce((s,p)=>s+g[p].details.filter(x=>x.filled).length,0);const n=['one','two','three'].reduce((s,p)=>s+data.counts[p],0);return `<span class="pill good">Đã có đáp án: ${done}/${n} câu</span> <span class="pill">Điểm tạm tính: ${fmt(g.total)}/${fmt(g.max)}</span>`}
 function sectionTabs(active,attr){return `<div class="tabstrip">${['one','two','three'].map((p,i)=>`<button class="tabbtn ${active===p?'active':''}" data-${attr}="${p}">Phần ${['I','II','III'][i]} (${data.counts[p]} câu)</button>`).join('')}</div>`}
 function nameKey(value){
@@ -114,8 +257,8 @@ function recognizedNamePanel(){
   ${ocrState.note?`<div class="ocr-status ${ocrState.status==='error'?'error':''}">${esc(ocrState.note)}</div>`:''}
   ${discrepancy?`<div class="notice" style="margin-top:8px">⚠ Tên OCR khác với danh sách theo SBD. Hãy xem lại vùng ảnh trước khi lưu. <b>Ứng dụng không tự thay thế tên đã xác định bằng SBD.</b></div>`:''}
   ${(!hasSBD||strongNameMismatch())&&ocrState.candidates.length?`<div class="label" style="margin-top:11px">Gợi ý từ danh sách — chạm để xác nhận đúng học sinh:</div><div class="ocr-candidates">${ocrState.candidates.map(r=>`<button class="btn sm secondary" data-act="confirm-ocr" data-sbd="${esc(r.sbd)}">${esc(r.name)} • ${esc(r.sbd)}${r.lop?' • '+esc(r.lop):''}</button>`).join('')}</div>`:''}
-  ${!hasSBD&&ocrState.status==='done'&&!ocrState.candidates.length?'<div class="notice" style="margin-top:8px">Chưa tìm thấy tên trùng khớp trong danh sách. Hãy chọn học sinh ở ô bên trên, không lưu theo tên OCR chưa xác thực.</div>':''}
-  ${strongNameMismatch()&&!ocrState.mismatchReviewed?`<div class="notice" style="margin-top:9px"><b>Chưa cho phép lưu:</b> tên OCR khớp một học sinh khác trong danh sách. Kiểm tra ảnh và chọn tên đúng, hoặc <button class="btn sm" data-act="confirm-sbd">Xác nhận tên theo SBD là đúng</button>.</div>`:''}
+  ${!hasSBD&&ocrState.status==='done'&&!ocrState.candidates.length?'<div class="notice" style="margin-top:8px">Chưa tìm thấy tên trong danh sách. Có thể bỏ trống tên và vẫn lưu bảng điểm. Không tự gán tên từ OCR chưa xác thực.</div>':''}
+  ${strongNameMismatch()&&!ocrState.mismatchReviewed?`<div class="notice" style="margin-top:9px"><b>Cảnh báo:</b> tên OCR khớp một học sinh khác trong danh sách. Kiểm tra ảnh và chọn tên đúng, hoặc <button class="btn sm" data-act="confirm-sbd">Xác nhận tên theo SBD là đúng</button>.</div>`:''}
   <div class="row" style="margin-top:10px"><button class="btn sm" data-act="retry-ocr" ${!photo||camPts.length!==4?'disabled':''}>↻ Nhận dạng lại tên</button><span class="small muted">OCR chạy trên trình duyệt; cần Internet để tải bộ tiếng Việt lần đầu.</span></div>
  </div>`;
 }
@@ -193,35 +336,36 @@ async function recognizeVietnameseName(){
 }
 function screenGrade(){
  const g=grading(),identified=data.roster.some(r=>r.sbd===data.student.sbd);
- document.getElementById('screen').innerHTML=header('Chấm bài và bảng điểm','Quét SBD tự nhận tên, điểm 3 phần và tổng điểm tự cập nhật.',`<div class="grade-actions"><button class="btn secondary" data-act="new-paper">📷 Phiếu tiếp theo</button><button class="btn primary" data-act="save-next">✓ Lưu & quét tiếp</button></div>`)+
- `<div class="stack">${missingAnswerCount()?`<div class="notice" style="border-color:#efc884;background:#fff9e8"><b>⚠ Chưa đủ đáp án chuẩn:</b> còn ${missingAnswerCount()} đáp án hoặc ý chưa thiết lập. <a href="#" data-tab="keys">Nhập đáp án chuẩn</a> trước khi lưu điểm.</div>`:''}<section class="card"><div class="section-title"><h2 class="h2">Nhận diện học sinh tự động</h2><span class="section-tag">Không cần gõ tên hoặc SBD</span></div>
- <div class="student-id-panel"><div class="label">Họ và tên (từ SBD hoặc đã xác nhận OCR tiếng Việt)</div><div class="identity-chip" id="identity-name">${esc(data.student.name||'Chưa xác định')}</div>
- <div class="row" style="margin-top:10px;gap:14px"><span class="small">Số báo danh: <b id="identity-sbd">${esc(data.student.sbd||'—')}</b></span><span class="small">Mã đề: <b id="identity-code">${esc(data.student.code||'—')}</b></span><span class="small"><a href="#" data-tab="students">Danh sách (${data.roster.length} học sinh)</a></span></div>${identityNotice()}<div id="ocr-panel-slot">${recognizedNamePanel()}</div>
+ document.getElementById('screen').innerHTML=header('Chấm bài và bảng điểm','Có thể chấm và lưu phiếu không có họ tên hoặc SBD; điểm 3 phần tự cập nhật.',`<div class="grade-actions"><button class="btn secondary" data-act="new-paper">📷 Phiếu tiếp theo</button><button class="btn primary" data-act="save-next">✓ Lưu & quét tiếp</button></div>`)+
+ `<div class="stack">${missingAnswerCount()?`<div class="notice" style="border-color:#efc884;background:#fff9e8"><b>⚠ Chưa đủ đáp án chuẩn:</b> còn ${missingAnswerCount()} đáp án hoặc ý chưa thiết lập. <a href="#" data-tab="keys">Nhập đáp án chuẩn</a> trước khi lưu điểm.</div>`:''}<section class="card"><div class="section-title"><h2 class="h2">Nhận diện học sinh — tùy chọn</h2><span class="section-tag">Không cần tên / SBD vẫn lưu điểm</span></div>
+ <div class="student-id-panel"><div class="notice green" style="margin-bottom:10px">✓ Không cần họ tên hoặc số báo danh: có thể chấm và lưu điểm theo <b>mã phiếu riêng</b>. Mã đề để chọn đáp án vẫn cần xác định.</div><div class="label">Họ tên (nếu nhận được; có thể bỏ trống)</div><div class="identity-chip" id="identity-name">${esc(data.student.name||'Không bắt buộc')}</div>
+ <div class="row" style="margin-top:10px;gap:14px"><span class="small">Số báo danh (tùy chọn): <b id="identity-sbd">${esc(data.student.sbd||'—')}</b></span><span class="small">Mã đề: <b id="identity-code">${esc(data.student.code||'—')}</b></span><span class="small">Mã phiếu: <b>${esc((data.paperId||'').slice(-12))}</b></span><span class="small"><a href="#" data-tab="students">Danh sách (${data.roster.length} học sinh)</a></span></div>${identityNotice()}<div class="row" style="margin-top:10px"><button class="btn sm secondary" data-act="retry-ocr">🔤 Nhận dạng họ tên tiếng Việt (nếu cần)</button><span class="small muted">Không cần OCR tên để chấm hay lưu điểm.</span></div><div id="ocr-panel-slot">${recognizedNamePanel()}</div>
  <details id="identity-manual" ${identified?'':'open'} style="margin-top:12px"><summary style="cursor:pointer;font-weight:750;color:#16777c">${identified?'Chọn lại học sinh (khi nhận sai SBD)':'Không nhận được SBD? Chọn tên trong danh sách'}</summary>
- <div style="margin-top:10px"><label class="label">Tìm theo tên, số báo danh hoặc lớp</label><input type="search" class="field" id="student-search" placeholder="Lọc danh sách học sinh" autocomplete="off" style="margin-bottom:7px"><select class="field" id="student-picker">${studentOptions()}</select></div></details></div></section>
- <section class="card" style="padding:12px">${summary(g)}</section>
- ${camRead?`<div class="notice"><b>Phiếu vừa quét:</b> ${camRead.cnt} ô đã đọc; ${camRead.uncertain} ô trống/mờ/nghi ngờ. <b>Điểm hiện tại là tạm tính.</b> Phần III cần đối chiếu thủ công trước khi lưu.<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">Xem gợi ý nhận dạng Phần III</summary><div style="margin-top:7px">${camRead.suspects.map(esc).join('<br>')}</div></details></div>`:''}
+ <div style="margin-top:10px"><label class="label">Tìm theo tên, số báo danh hoặc lớp</label><input type="search" class="field" id="student-search" placeholder="Lọc danh sách học sinh" autocomplete="off" style="margin-bottom:7px"><select class="field" id="student-picker">${studentOptions()}</select></div></details><div class="row" style="margin-top:12px"><label style="flex:2;min-width:180px"><span class="label">Họ tên (không bắt buộc)</span><input class="field" data-student="name" value="${esc(data.student.name||'')}" maxlength="120" placeholder="Bỏ trống nếu không cần"></label><label style="flex:1;min-width:140px"><span class="label">SBD (không bắt buộc)</span><input class="field" data-student="sbd" value="${esc(data.student.sbd||'')}" inputmode="numeric" maxlength="12" placeholder="Bỏ trống"></label></div><div class="row" style="margin-top:12px"><label style="flex:1;min-width:160px"><span class="label">Mã đề để chấm</span><select class="field" id="grade-code">${codePicker(data.student.code)}</select></label><label style="flex:2;min-width:190px"><span class="label">Giáo viên chấm</span><input class="field" id="grader-display" value="${esc(graderName)}" maxlength="90" placeholder="Giáo viên"></label></div></div></section>
+ <section class="card" style="padding:12px">${summary(g)}<label style="display:flex;gap:9px;align-items:start;margin-top:13px"><input id="verify-third" type="checkbox" style="width:18px;height:18px;margin-top:2px"><span class="small"><b>Tôi đã kiểm tra trực tiếp phần III và xác nhận các câu nghi ngờ.</b> Bắt buộc trước khi lưu (nếu đề có Phần III).</span></label></section>
+ ${(!data.student.code&&codes().length>1)?'<div class="notice" style="border-color:#e3af62;background:#fff8e8"><b>⚠ Camera chưa đọc được mã đề.</b> Điểm đang hiển thị chỉ là điểm xem trước, <b>không được sử dụng</b> cho đến khi chọn đúng mã đề.</div>':''}
+ ${(data.student.code&&!data.keysByCode[data.student.code])?`<div class="notice"><b>⚠ Mã đề ${esc(data.student.code)} chưa có đáp án trên Google Sheets.</b> Kiểm tra lại mã đề, hoặc vào mục Đáp án để thiết lập mã này trước khi lưu.</div>`:''}
+ ${camRead?`<div class="notice"><b>Phiếu vừa quét:</b> ${camRead.cnt} ô đã đọc; ${camRead.uncertain} ô trống/mờ/nghi ngờ. <b>Điểm hiện tại là tạm tính.</b> Các giá trị Phần III được máy đọc là gợi ý, bắt buộc đối chiếu trước khi lưu.<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">Xem gợi ý nhận dạng Phần III</summary><div style="margin-top:7px">${camRead.suspects.map(esc).join('<br>')}</div></details></div>`:''}
  <section class="card"><div class="section-title"><h2 class="h2">Bài làm học sinh</h2><div id="status-grade">${statsLine(g)}</div></div>
- ${sectionTabs(gradeSection,'grade-section')}<div id="grade-question-area" style="margin-top:14px">${gradeQuestions(gradeSection,g)}</div><div style="margin-top:17px" class="row between"><span class="small muted">Có thể sửa những ô nhận dạng chưa rõ, điểm thay đổi trực tiếp.</span><div class="grade-actions"><button class="btn sm secondary" data-tab="camera">📷 Quét lại</button><button class="btn sm" data-act="sample">Nạp bài mẫu</button><button class="btn sm" data-act="clear">Xóa đáp án</button><button class="btn sm dark" data-act="save-grade">Lưu bảng điểm</button></div></div></section></div>`;
+ ${sectionTabs(gradeSection,'grade-section')}<div id="grade-question-area" style="margin-top:14px">${gradeQuestions(gradeSection,g)}</div><div style="margin-top:17px" class="row between"><span class="small muted">Có thể sửa những ô nhận dạng chưa rõ, điểm thay đổi trực tiếp.</span><div class="grade-actions"><button class="btn sm secondary" data-tab="camera">📷 Quét lại</button><button class="btn sm" data-act="clear">Xóa đáp án</button><button class="btn sm dark" data-act="save-grade">Lưu bảng điểm</button></div></div></section></div>`;
 }
 function gradeQuestions(p,g){if(p==='one')return `<div class="qgrid">${Array.from({length:data.counts.one},(_,i)=>{const x=g.one.details[i];return `<div class="qbox"><div class="qtop"><b>Câu ${i+1}</b><span class="qscore">${fmt(x.earned)} / ${fmt(x.max)}</span></div><div class="anschoices">${'ABCD'.split('').map(a=>`<button class="choice ${data.responses.one[i]===a?(x.ok?'goodsel':'badsel'):''}" data-res-one="${i}" data-a="${a}">${a}</button>`).join('')}</div></div>`}).join('')}</div>`;
 if(p==='two')return `<div class="qgrid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">${Array.from({length:data.counts.two},(_,i)=>{const x=g.two.details[i],r=data.responses.two[i]||[];return `<div class="qbox"><div class="qtop"><b>Câu ${i+1}</b><span class="qscore">Đúng ${x.n}/4 • ${fmt(x.earned)}/${fmt(x.max)}</span></div>${['a','b','c','d'].map((y,j)=>`<div class="tfrow"><b>${y})</b><div class="tf-controls">${['Đ','S'].map(a=>`<button class="choice ${r[j]===a?(data.keys.two[i][j]===a?'goodsel':'badsel'):''}" data-res-two="${i}" data-sub="${j}" data-a="${a}">${a==='Đ'?'Đúng':'Sai'}</button>`).join('')}</div></div>`).join('')}</div>`}).join('')}</div>`;
 return `<div class="qgrid" style="grid-template-columns:repeat(auto-fit,minmax(155px,1fr))">${Array.from({length:data.counts.three},(_,i)=>{const x=g.three.details[i];return `<div class="qbox"><div class="qtop"><b>Câu ${i+1}</b><span class="qscore">${fmt(x.earned)} / ${fmt(x.max)}</span></div><input class="field" type="text" inputmode="decimal" data-res-three="${i}" value="${esc(data.responses.three[i]||'')}" placeholder="VD: -1,5"><div class="small" style="margin-top:6px;color:${x.ok?'#148a65':'#8794a6'}">${x.ok?'✓ Đúng':'Đáp án: '+esc(data.keys.three[i])}</div></div>`}).join('')}</div>`}
 function rerenderGradeQuestions(){if(tab!=='grade')return;const x=document.getElementById('grade-question-area');if(x)x.innerHTML=gradeQuestions(gradeSection,grading());updateSummary()}
-function screenConfig(){document.getElementById('screen').innerHTML=header('Cấu hình đề thi & thang điểm','Chỉnh số câu, điểm từng câu và quy tắc chấm. Không vượt quá số ô trên mẫu phiếu.')+`<div class="stack"><section class="card"><h2 class="h2" style="margin-bottom:14px">Số câu và điểm các phần</h2><div class="config-grid">${['one','two','three'].map((p,i)=>`<div class="config-unit"><h3>Phần ${['I','II','III'][i]} <span class="pill">Tối đa ${maxima[p]} câu</span></h3><div class="form3"><div><label class="label">Số câu</label><input class="field" type="number" min="0" max="${maxima[p]}" data-count="${p}" value="${data.counts[p]}"></div><div><label class="label">Điểm phần</label><input class="field" type="number" step="any" min="0" data-total="${p}" value="${Number(sumPart(p).toFixed(4))}"></div><div class="span"><button class="btn sm secondary" data-act="distribute" data-part="${p}">Chia đều điểm cho ${data.counts[p]} câu</button></div></div><div class="small muted" style="margin-top:12px">Điểm hiện tại: <b>${fmt(sumPart(p))}</b></div></div>`).join('')}</div><div class="summary-strip" style="margin-top:15px"><span>Thang điểm hiện tại của cả bài</span><span style="font-size:21px;color:#0b7780">${fmt(allMax())} điểm</span></div></section><section class="card"><div class="section-title"><h2 class="h2">Điểm riêng cho từng câu</h2><span class="pill">Thay đổi sẽ được áp dụng khi chấm</span></div>${sectionTabs(section,'cfg-section')}<div id="weight-rows" style="margin-top:14px">${weightRows(section)}</div></section><section class="card"><div class="section-title"><h2 class="h2">Quy tắc chấm phần II – Đúng/Sai</h2><span class="section-tag">Tùy chỉnh mức điểm</span></div><p class="muted small">Điểm nhận được = điểm tối đa của câu × hệ số tương ứng với số ý làm đúng. Có thể đặt 0, 0,25, 0,5, 1 hoặc hệ số khác.</p><div class="row" style="margin-top:12px">${data.scoreScale.map((v,i)=>`<label style="flex:1;min-width:92px"><span class="label">${i}/4 ý đúng</span><input type="number" step="0.01" min="0" max="1" class="field" data-scale="${i}" value="${v}"></label>`).join('')}</div><p class="small muted" style="margin-top:12px">Ví dụ: 1 câu tối đa 0,5 điểm, làm đúng 3 ý, hệ số 0,5 → được 0,25 điểm.</p></section></div>`}
+function screenConfig(){document.getElementById('screen').innerHTML=header('Cấu hình đề thi & thang điểm','Số câu, thang điểm và quy tắc chấm lưu trên Google Sheets.',`<button class="btn primary" data-act="sync-config">☁ Lưu cấu hình lên Sheets</button>`)+`<div class="stack"><section class="card"><h2 class="h2" style="margin-bottom:12px">Thông tin bài kiểm tra</h2><div class="config-exam"><label><span class="label">Mã bài kiểm tra (không dấu/cách)</span><input class="field" id="exam-id" value="${esc(data.examId)}" maxlength="40" placeholder="DE-001"></label><label><span class="label">Tên bài kiểm tra</span><input class="field" id="exam-name" value="${esc(data.examName)}" placeholder="Kiểm tra giữa kì"></label></div><div class="small muted" style="margin-top:10px">Đổi mã bài kiểm tra để tạo đợt chấm mới. Lưu cấu hình trước, sau đó nhập đáp án cho từng mã đề.</div></section><section class="card"><h2 class="h2" style="margin-bottom:14px">Số câu và điểm các phần</h2><div class="config-grid">${['one','two','three'].map((p,i)=>`<div class="config-unit"><h3>Phần ${['I','II','III'][i]} <span class="pill">Tối đa ${maxima[p]} câu</span></h3><div class="form3"><div><label class="label">Số câu</label><input class="field" type="number" min="0" max="${maxima[p]}" data-count="${p}" value="${data.counts[p]}"></div><div><label class="label">Điểm phần</label><input class="field" type="number" step="any" min="0" data-total="${p}" value="${Number(sumPart(p).toFixed(4))}"></div><div class="span"><button class="btn sm secondary" data-act="distribute" data-part="${p}">Chia đều điểm cho ${data.counts[p]} câu</button></div></div><div class="small muted" style="margin-top:12px">Điểm hiện tại: <b>${fmt(sumPart(p))}</b></div></div>`).join('')}</div><div class="summary-strip" style="margin-top:15px"><span>Thang điểm hiện tại của cả bài</span><span style="font-size:21px;color:#0b7780">${fmt(allMax())} điểm</span></div></section><section class="card"><div class="section-title"><h2 class="h2">Điểm riêng cho từng câu</h2><span class="pill">Thay đổi sẽ được áp dụng khi chấm</span></div>${sectionTabs(section,'cfg-section')}<div id="weight-rows" style="margin-top:14px">${weightRows(section)}</div></section><section class="card"><div class="section-title"><h2 class="h2">Quy tắc chấm phần II – Đúng/Sai</h2><span class="section-tag">Tùy chỉnh mức điểm</span></div><p class="muted small">Điểm nhận được = điểm tối đa của câu × hệ số tương ứng với số ý làm đúng. Có thể đặt 0, 0,25, 0,5, 1 hoặc hệ số khác.</p><div class="row" style="margin-top:12px">${data.scoreScale.map((v,i)=>`<label style="flex:1;min-width:92px"><span class="label">${i}/4 ý đúng</span><input type="number" step="0.01" min="0" max="1" class="field" data-scale="${i}" value="${v}"></label>`).join('')}</div><p class="small muted" style="margin-top:12px">Ví dụ: 1 câu tối đa 0,5 điểm, làm đúng 3 ý, hệ số 0,5 → được 0,25 điểm.</p></section></div>`}
 function weightRows(p){return `<div class="qgrid">${Array.from({length:data.counts[p]},(_,i)=>`<label class="qbox"><span class="label">Câu ${i+1}</span><div class="row" style="gap:5px;flex-wrap:nowrap"><input type="number" min="0" step="any" class="field" data-weight="${p}" data-idx="${i}" value="${Number(Number(data.weights[p][i]||0).toFixed(5))}"><span class="small muted">đ</span></div></label>`).join('')}</div>`}
-function screenKeys(){document.getElementById('screen').innerHTML=header('Đáp án chuẩn','Nhập đáp án đúng cho từng câu ở cả 3 phần, áp dụng để chấm tự động.')+`<div class="stack"><section class="card"><div class="section-title"><h2 class="h2">Ngân hàng đáp án của đề thi</h2><button class="btn sm secondary" data-act="sample-keys">↺ Đáp án minh họa</button></div>${sectionTabs(keySection,'key-section')}<div id="key-rows" style="margin-top:15px">${keyRows(keySection)}</div></section><div class="notice blue">Mẫu hiện có một mã đề. Khi triển khai thực tế có thể tạo nhiều mã đề và chọn đáp án theo mã đề được tô trên phiếu.</div></div>`}
+function screenKeys(){document.getElementById('screen').innerHTML=header('Đáp án chuẩn • Google Sheets','Mỗi mã đề có bộ đáp án riêng cho Phần I, II, III.',`<button class="btn primary" data-act="sync-keys">☁ Lưu đáp án lên Sheets</button>`)+`<div class="stack"><section class="card"><div class="section-title"><h2 class="h2">Bài ${esc(data.examId)} • Mã đề ${esc(data.activeCode)}</h2><span class="pill">${codes().length} mã đề đã nạp</span></div><div class="row"><label style="flex:1;min-width:170px"><span class="label">Chọn mã đề hiện có</span><select class="field" id="key-code-select">${codePicker(data.activeCode)}</select></label><label style="flex:1;min-width:140px"><span class="label">Tạo mã đề mới (4 số)</span><input class="field" id="new-code" inputmode="numeric" maxlength="4" placeholder="Ví dụ: 0102"></label><button class="btn secondary" data-act="create-code" style="margin-top:16px">+ Tạo / mở mã đề</button></div><p class="small muted" style="margin:12px 0 0">Sau khi thay đáp án phải bấm <b>Lưu đáp án lên Sheets</b>. Đề chưa có đủ đáp án không được lưu kết quả chấm.</p></section><section class="card"><div class="section-title"><h2 class="h2">Nhập đáp án đúng cho mã đề ${esc(data.activeCode)}</h2></div>${sectionTabs(keySection,'key-section')}<div id="key-rows" style="margin-top:15px">${keyRows(keySection)}</div></section></div>`}
 function keyRows(p){if(p==='one')return `<div class="qgrid">${Array.from({length:data.counts.one},(_,i)=>`<div class="qbox"><div class="qtop"><b>Câu ${i+1}</b><span class="qscore">${fmt(data.weights.one[i])} điểm</span></div><div class="anschoices">${'ABCD'.split('').map(a=>`<button class="choice ${data.keys.one[i]===a?'selected':''}" data-key-one="${i}" data-a="${a}">${a}</button>`).join('')}</div></div>`).join('')}</div>`;
 if(p==='two')return `<div class="qgrid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">${Array.from({length:data.counts.two},(_,i)=>`<div class="qbox"><div class="qtop"><b>Câu ${i+1}</b><span class="qscore">${fmt(data.weights.two[i])} điểm</span></div>${['a','b','c','d'].map((q,j)=>`<div class="tfrow"><b>${q})</b><div class="tf-controls">${['Đ','S'].map(a=>`<button class="choice ${data.keys.two[i][j]===a?'selected':''}" data-key-two="${i}" data-sub="${j}" data-a="${a}">${a==='Đ'?'Đúng':'Sai'}</button>`).join('')}</div></div>`).join('')}</div>`).join('')}</div>`;
 return `<div class="qgrid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">${Array.from({length:data.counts.three},(_,i)=>`<label class="qbox"><span class="label">Câu ${i+1} • ${fmt(data.weights.three[i])} điểm</span><input type="text" inputmode="decimal" placeholder="VD: -1,5" class="field" data-key-three="${i}" value="${esc(data.keys.three[i])}"></label>`).join('')}</div>`}
 function rerenderKeys(){if(tab==='keys')document.getElementById('key-rows').innerHTML=keyRows(keySection)}
 function rerenderConfig(){if(tab==='config')screenConfig()}
-function screenStudents(){document.getElementById('screen').innerHTML=header('Danh sách học sinh','Tải danh sách một lần. Những lần chấm sau tự nhận họ tên theo SBD trên phiếu.')+`<div class="stack"><section class="card"><h2 class="h2">Thêm học sinh</h2><div class="row" style="margin-top:13px"><label style="flex:1;min-width:125px"><span class="label">Số báo danh</span><input class="field" id="roster-sbd" placeholder="VD: 00012345" inputmode="numeric"></label><label style="flex:2;min-width:180px"><span class="label">Họ và tên</span><input class="field" id="roster-name" placeholder="Họ tên học sinh"></label><label style="flex:1;min-width:100px"><span class="label">Lớp</span><input class="field" id="roster-class" placeholder="VD: 9A"></label><button class="btn primary" style="margin-top:18px" data-act="add-student">+ Thêm</button></div><hr class="divider"><div class="row"><label class="btn secondary">↑ Nhập CSV từ Excel<input type="file" id="roster-file" accept=".csv,text/csv,text/plain" hidden></label><button class="btn" data-act="sample-roster">Nạp danh sách mẫu</button></div><p class="small muted">Tải từ Excel dưới dạng CSV UTF-8. Tệp có 3 cột: SBD, Họ và tên, Lớp. Ví dụ: 01234567,Nguyễn Văn An,9A. SBD có số 0 đầu phải được giữ nguyên dưới dạng văn bản.</p></section><section class="card"><div class="section-title"><h2 class="h2">Danh sách đã lưu</h2><span class="pill">${data.roster.length} học sinh</span></div>${data.roster.length?`<div class="scrollx"><table class="history-table"><thead><tr><th>STT</th><th>Số báo danh</th><th>Họ và tên</th><th>Lớp</th><th></th></tr></thead><tbody>${data.roster.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.sbd)}</td><td><b>${esc(r.name)}</b></td><td>${esc(r.lop)}</td><td><button class="btn sm danger" data-act="remove-student" data-index="${i}">Xóa</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="empty">Chưa có học sinh.</p>'}</section></div>`}
+function screenStudents(){document.getElementById('screen').innerHTML=header('Danh sách học sinh','Tải danh sách một lần. Những lần chấm sau tự nhận họ tên theo SBD trên phiếu.')+`<div class="stack"><section class="card"><h2 class="h2">Thêm học sinh</h2><div class="row" style="margin-top:13px"><label style="flex:1;min-width:125px"><span class="label">Số báo danh</span><input class="field" id="roster-sbd" placeholder="VD: 00012345" inputmode="numeric"></label><label style="flex:2;min-width:180px"><span class="label">Họ và tên</span><input class="field" id="roster-name" placeholder="Họ tên học sinh"></label><label style="flex:1;min-width:100px"><span class="label">Lớp</span><input class="field" id="roster-class" placeholder="VD: 9A"></label><button class="btn primary" style="margin-top:18px" data-act="add-student">+ Thêm</button></div><hr class="divider"><div class="row"><label class="btn secondary">↑ Nhập CSV từ Excel<input type="file" id="roster-file" accept=".csv,text/csv,text/plain" hidden></label><button class="btn primary" data-act="sync-roster">☁ Lưu danh sách lên Sheets</button></div><p class="small muted">Tải từ Excel dưới dạng CSV UTF-8. Tệp có 3 cột: SBD, Họ và tên, Lớp. Ví dụ: 01234567,Nguyễn Văn An,9A. SBD có số 0 đầu phải được giữ nguyên dưới dạng văn bản.</p></section><section class="card"><div class="section-title"><h2 class="h2">Danh sách đang chỉnh (nhấn Lưu lên Sheets)</h2><span class="pill">${data.roster.length} học sinh</span></div>${data.roster.length?`<div class="scrollx"><table class="history-table"><thead><tr><th>STT</th><th>Số báo danh</th><th>Họ và tên</th><th>Lớp</th><th></th></tr></thead><tbody>${data.roster.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.sbd)}</td><td><b>${esc(r.name)}</b></td><td>${esc(r.lop)}</td><td><button class="btn sm danger" data-act="remove-student" data-index="${i}">Xóa</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="empty">Chưa có học sinh.</p>'}</section></div>`}
 function matchStudent(){
   const id=String(data.student.sbd||'').trim();
   const r=data.roster.find(x=>String(x.sbd).trim()===id);
-  data.student.name=r?r.name:'';
-  data.student.lop=r?r.lop:'';
+  if(r){data.student.name=r.name;data.student.lop=r.lop;}else{data.student.lop='';}
   return !!r;
 }
 function studentOptions(query=''){
@@ -231,16 +375,15 @@ function studentOptions(query=''){
  return `<option value="">— Chọn học sinh từ danh sách —</option>`+roster.map(r=>`<option value="${esc(r.sbd)}" ${r.sbd===current?'selected':''}>${esc(r.name)} • SBD ${esc(r.sbd)}${r.lop?' • '+esc(r.lop):''}</option>`).join('');
 }
 function identityNotice(){
- const r=data.roster.find(x=>String(x.sbd)===String(data.student.sbd));
- if(r)return `<div class="notice green identity-alert" id="identity-alert">✓ Đã nhận diện: <b>${esc(r.name)}</b> • SBD ${esc(r.sbd)}${r.lop?' • Lớp '+esc(r.lop):''}. Không cần nhập họ tên.</div>`;
- if(!data.roster.length)return `<div class="notice identity-alert" id="identity-alert">Chưa có danh sách học sinh. <a href="#" data-tab="students">Nhập danh sách một lần bằng CSV</a> trước khi chấm.</div>`;
- return `<div class="notice identity-alert" id="identity-alert">${camRead?'⚠ Camera chưa xác định chắc chắn số báo danh. ':'Chưa chọn học sinh. '}Chỉ cần <b>chọn học sinh từ danh sách</b> bên trên, không phải gõ tên hoặc SBD.</div>`;
+ const r=data.student.sbd&&data.roster.find(x=>String(x.sbd)===String(data.student.sbd));
+ if(r)return `<div class="notice green identity-alert" id="identity-alert">✓ SBD đã đối chiếu: <b>${esc(r.name)}</b> • ${esc(r.sbd)}. Có thể lưu trực tiếp.</div>`;
+ return `<div class="notice green identity-alert" id="identity-alert">✓ Không bắt buộc xác định học sinh. Nếu muốn, hãy chọn một tên trong danh sách hoặc nhập tên/SBD tùy ý. Bảng điểm vẫn lưu vào Google Sheets theo mã phiếu.</div>`;
 }
 function updateIdentity(){
  const picker=document.getElementById('student-picker');
  if(picker)picker.value=data.roster.some(r=>r.sbd===data.student.sbd)?data.student.sbd:'';
  const display=document.getElementById('identity-name');
- if(display)display.textContent=data.student.name||'Chưa xác định';
+ if(display)display.textContent=data.student.name||'Không bắt buộc';
  const sbd=document.getElementById('identity-sbd');if(sbd)sbd.textContent=data.student.sbd||'—';
  const code=document.getElementById('identity-code');if(code)code.textContent=data.student.code||'—';
  const notice=document.getElementById('identity-alert');if(notice)notice.outerHTML=identityNotice();ocrPanelUpdate();
@@ -248,58 +391,277 @@ function updateIdentity(){
 }
 function emptyResponses(){return {one:Array(maxima.one).fill(''),two:Array.from({length:maxima.two},()=>['','','','']),three:Array(maxima.three).fill('')}}
 function newPaper(force=false){
- if(!force&&data.student.sbd&&['one','two','three'].some(p=>data.responses[p].some(v=>Array.isArray(v)?v.some(Boolean):!!v))){
+ if(!force&&['one','two','three'].some(p=>data.responses[p].some(v=>Array.isArray(v)?v.some(Boolean):!!v))){
   if(!window.confirm('Chuyển sang phiếu mới sẽ xóa bài làm hiện tại trên màn hình. Bạn đã lưu kết quả chưa?'))return;
  }
  stopCam();photo=null;camPts=[];camRead=null;scanToken++;ocrState={status:'',raw:'',confidence:0,candidates:[],preview:'',note:''};
- data.student={name:'',sbd:'',code:'',lop:''};data.responses=emptyResponses();
+ data.paperId=newPaperId();data.student={name:'',sbd:'',code:'',lop:''};data.responses=emptyResponses();
  tab='camera';save();render();window.scrollTo({top:0,behavior:'auto'});
- toast('Bài mới: đưa phiếu tiếp theo vào camera. Tên sẽ tự hiện theo SBD đã quét.');
+ toast('Bài mới: đưa phiếu tiếp theo vào camera. Đủ 4 mốc rõ nét sẽ tự chụp và chấm.');
+ startCam();
 }
-function importRoster(file){if(!file)return;const r=new FileReader();r.onload=()=>{const lines=String(r.result).replace(/^\uFEFF/,'').split(/\r?\n/).filter(s=>s.trim());let added=0;for(const line of lines){const sep=line.includes('\t')?'\t':line.includes(';')?';':',';const items=line.split(sep).map(t=>t.trim().replace(/^"|"$/g,''));if(items.length<2||/^(sbd|số báo danh|stt)$/i.test(items[0]))continue;const [sbd,name,lop='']=items;if(!sbd||!name)continue;const vnName=name.normalize('NFC');const ex=data.roster.find(x=>x.sbd===sbd);if(ex){ex.name=vnName;ex.lop=lop}else data.roster.push({sbd,name:vnName,lop});added++}save();screenStudents();toast('Đã nhập/cập nhật '+added+' học sinh')};r.readAsText(file,'utf-8')}
-function screenHistory(){document.getElementById('screen').innerHTML=header('Lịch sử kết quả chấm','Danh sách học sinh đã lưu, có điểm riêng của mỗi phần và tổng điểm.',`<button class="btn primary" data-act="export">↓ Xuất CSV (Excel)</button>`)+`<section class="card" style="margin-bottom:14px"><div class="section-title"><h2 class="h2">Sao lưu và khôi phục dữ liệu</h2><span class="pill warn">Lưu trên thiết bị này</span></div><p class="small muted">Sao lưu gồm danh sách học sinh, đáp án, cấu hình điểm và toàn bộ lịch sử chấm. Tệp JSON có dữ liệu học sinh: cần giữ bảo mật.</p><div class="row"><button class="btn secondary" data-act="backup">↓ Sao lưu toàn bộ (.json)</button><label class="btn">↑ Khôi phục từ tệp JSON<input type="file" id="backup-file" accept=".json,application/json" hidden></label></div></section><section class="card"><div class="section-title"><h2 class="h2">Danh sách bài đã chấm</h2><span class="pill">${data.history.length} bài</span></div>${data.history.length?`<div class="scrollx"><table class="history-table"><thead><tr><th>Thời gian</th><th>Họ tên</th><th>SBD</th><th>Mã đề</th><th>Phần I</th><th>Phần II</th><th>Phần III</th><th>Tổng</th><th></th></tr></thead><tbody>${data.history.map((h,i)=>`<tr><td class="small">${esc(h.at)}</td><td><b>${esc(h.name)}</b></td><td>${esc(h.sbd)}</td><td>${esc(h.code)}</td><td>${fmt(h.scores.one)}</td><td>${fmt(h.scores.two)}</td><td>${fmt(h.scores.three)}</td><td><b>${fmt(h.scores.total)}</b>/${fmt(h.scores.max)}</td><td><button class="btn sm" data-act="load-history" data-index="${i}">Xem</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Chưa có bài chấm nào được lưu. Vào mục Chấm bài và chọn “Lưu kết quả”.</div>'}</section>`}
-function screenCamera(){document.getElementById('screen').innerHTML=header('Chấm phiếu qua camera','Camera đọc ô tô và SBD, đồng thời thử nhận dạng họ tên tiếng Việt có dấu.')+`<div class="stack"><section class="card"><div class="cam-layout"><div><div id="cam-box" class="cam-box"><div class="cam-placeholder"><div class="big">📷</div><b>Chưa có ảnh phiếu</b><p class="small">Chọn chụp ảnh hoặc tải ảnh phiếu để bắt đầu.</p></div></div><div class="row" style="margin-top:12px"><label class="btn primary">📸 Chụp / tải ảnh<input type="file" id="file-photo" accept="image/*" capture="environment" hidden></label><button class="btn" data-act="start-cam">🎥 Bật camera</button><button class="btn" data-act="snap" id="btn-snap" disabled>Chụp khung hình</button></div></div><div><h2 class="h2">Quét phiếu mẫu</h2><p class="muted small">Nhận SBD → dò danh sách → tự hiện họ tên tiếng Việt có dấu; OCR đọc thêm tên viết tay để đối chiếu. Mẫu gồm 40 câu ABCD, 8 câu đúng/sai, 6 câu trả lời số.</p><div class="notice blue"><b>Cách quét</b><br>① Chụp rõ toàn bộ tờ phiếu.<br>② Chạm lần lượt tâm 4 ô vuông đen ở: <b>trên trái → trên phải → dưới phải → dưới trái</b>.<br>③ Nhấn “Đọc phiếu + tên tiếng Việt”; kiểm tra tên và những câu nghi ngờ.</div><div id="corner-help" class="scan-mark" style="display:inline-block;margin-top:12px">Chưa chọn ảnh</div><div class="row" style="margin-top:11px"><button class="btn secondary" data-act="read-photo" id="btn-read" disabled>🔎 Đọc phiếu + tên tiếng Việt</button><button class="btn" data-act="reset-corners" id="btn-reset" disabled>Đặt lại 4 góc</button></div><div id="omr-message" class="small muted" style="margin-top:11px"></div></div></div></section><div class="notice">OCR tiếng Việt phù hợp nhất với chữ in rõ; chữ viết tay có thể sai dấu/chữ, nên đối chiếu với SBD và danh sách học sinh. OCR cần mạng để tải bộ ngôn ngữ lần đầu. Đọc ô tô bằng ảnh là tính năng <b>thử nghiệm</b>: cần ảnh sáng, phiếu phẳng và được căn đúng bốn mốc. Phần III (trả lời bằng số) được đưa ra để kiểm tra thủ công trước khi lưu, vì ô dấu phẩy/dấu âm có thể đọc nhầm.</div></div>`;updateCamView()}
+function importRoster(file){if(!file)return;const r=new FileReader();r.onload=()=>{const lines=String(r.result).replace(/^\uFEFF/,'').split(/\r?\n/).filter(s=>s.trim());let added=0;for(const line of lines){const sep=line.includes('\t')?'\t':line.includes(';')?';':',';const items=line.split(sep).map(t=>t.trim().replace(/^"|"$/g,''));if(items.length<2||/^(sbd|số báo danh|stt)$/i.test(items[0]))continue;const [sbd,name,lop='']=items;if(!sbd||!name)continue;const vnName=name.normalize('NFC');const ex=data.roster.find(x=>x.sbd===sbd);if(ex){ex.name=vnName;ex.lop=lop}else data.roster.push({sbd,name:vnName,lop});added++}save();screenStudents();dirtyCloud('Danh sách');toast('Đã nhập/cập nhật '+added+' học sinh')};r.readAsText(file,'utf-8')}
+function screenHistory(){document.getElementById('screen').innerHTML=header('Lịch sử kết quả chấm','Danh sách học sinh đã lưu, có điểm riêng của mỗi phần và tổng điểm.',`<button class="btn primary" data-act="export">↓ Xuất CSV (Excel)</button>`)+`<section class="card" style="margin-bottom:14px"><div class="section-title"><h2 class="h2">Sao lưu và khôi phục dữ liệu</h2><span class="pill good">Dữ liệu chính nằm trên Google Sheets</span></div><p class="small muted">Xuất bản sao dữ liệu vừa tải từ Sheets để lưu trữ. Khôi phục JSON chỉ tạo bản nháp trong trình duyệt; KHÔNG tự ghi đè Google Sheets. Cần bấm các nút Lưu lên Sheets riêng ở từng phần.</p><div class="row"><button class="btn secondary" data-act="backup">↓ Sao lưu toàn bộ (.json)</button></div></section><section class="card"><div class="section-title"><h2 class="h2">Danh sách bài đã chấm</h2><span class="pill">${data.history.length} bài</span></div>${data.history.length?`<div class="scrollx"><table class="history-table"><thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Họ tên</th><th>SBD</th><th>Mã đề</th><th>Phần I</th><th>Phần II</th><th>Phần III</th><th>Tổng</th><th></th></tr></thead><tbody>${data.history.map((h,i)=>`<tr><td class="small">${esc(String(h.id||'').slice(-9))}</td><td class="small">${esc(h.at)}</td><td><b>${esc(h.name||'Phiếu không tên')}</b></td><td>${esc(h.sbd)}</td><td>${esc(h.code)}</td><td>${fmt(h.scores.one)}</td><td>${fmt(h.scores.two)}</td><td>${fmt(h.scores.three)}</td><td><b>${fmt(h.scores.total)}</b>/${fmt(h.scores.max)}</td><td><button class="btn sm" data-act="load-history" data-index="${i}">Xem</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Chưa có bài chấm nào được lưu. Vào mục Chấm bài và chọn “Lưu kết quả”.</div>'}</section>`}
+function screenCamera(){
+ document.getElementById('screen').innerHTML=header('Tự động chấm bằng camera','Đưa toàn bộ phiếu vào khung hình: tự nhận 4 mốc đen, đọc các ô tô và chấm ngay; SBD/tên chỉ là thông tin bổ sung.')+
+ `<div class="stack"><section class="card"><div class="cam-layout"><div>
+ <div id="cam-box" class="cam-box"><div class="cam-placeholder"><div class="big">📷</div><b>Chưa mở camera</b><p class="small">Nhấn “Bật camera tự quét” hoặc chọn ảnh đã chụp.</p></div></div>
+ <div class="row" style="margin-top:12px"><button class="btn primary" data-act="start-cam">🎥 Bật camera tự quét</button><button class="btn" data-act="snap" id="btn-snap" disabled>📸 Chụp ngay</button><button class="btn" data-act="torch" id="btn-torch" hidden>💡 Bật đèn</button><label class="btn secondary">📁 Tải ảnh phiếu<input type="file" id="file-photo" accept="image/*" capture="environment" hidden></label></div>
+ <div id="live-instruction" class="live-instruction" role="status" aria-live="polite">Trạng thái: chưa mở camera.</div>
+ </div><div><h2 class="h2">Chế độ tự động</h2><p class="small muted">Camera phát hiện 4 ô vuông đen ở góc tờ phiếu. Khi khung hình rõ, đủ mốc và ổn định, ứng dụng tự chụp, đọc SBD, đáp án Phần I–II và chuyển sang bảng điểm.</p>
+ <div class="notice blue"><b>Hướng dẫn quét</b><br>① Cho phép camera sau khi nhấn nút mở.<br>② Đặt cả 4 góc phiếu vào hình, giữ tờ giấy phẳng và đủ sáng.<br>③ Giữ ổn định 3 khung hình có đủ độ nét; ứng dụng tự chụp và chấm tạm tính.<br>④ Nếu camera không nhận: chọn ảnh; ứng dụng tự dò mốc, hoặc chạm 4 góc để căn thủ công.</div>
+ <div id="corner-help" class="scan-mark" style="display:inline-block;margin-top:12px">Chưa chọn ảnh</div>
+ <div class="row" style="margin-top:11px"><button class="btn secondary" data-act="read-photo" id="btn-read" disabled>🔎 Đọc ảnh đang chọn</button><button class="btn" data-act="reset-corners" id="btn-reset" disabled>Đặt lại 4 góc</button></div><div id="omr-message" class="small muted" style="margin-top:11px"></div></div></div></section>
+ <div class="notice">Khi camera nhận dạng được phiếu, điểm Phần I–II hiện ngay và Phần III chờ giáo viên kiểm tra. <b>Ứng dụng không tự lưu điểm khi chưa xác nhận.</b> Không cần tên hoặc SBD để chấm và lưu; có SBD sẽ tra cứu danh sách Sheets. OCR chữ viết tay chỉ là gợi ý.</div></div>`;
+ updateCamView();
+}
 function updateCamView(){if(tab!=='camera')return;const box=document.getElementById('cam-box'),help=document.getElementById('corner-help'),read=document.getElementById('btn-read'),reset=document.getElementById('btn-reset');if(photo){box.innerHTML='<div class="overlay-stage"><canvas id="photo-canvas"></canvas></div>';const c=document.getElementById('photo-canvas'),mx=Math.min(1100/photo.width,750/photo.height,1),w=Math.round(photo.width*mx),h=Math.round(photo.height*mx);c.width=w;c.height=h;const ctx=c.getContext('2d');ctx.drawImage(photo,0,0,w,h);ctx.fillStyle='#00f5c8';ctx.strokeStyle='#00f5c8';ctx.lineWidth=2;camPts.forEach(([px,py],i)=>{const x=px*mx,y=py*mx;ctx.beginPath();ctx.arc(x,y,7,0,7);ctx.fill();ctx.font='bold 18px Arial';ctx.fillText(String(i+1),x+9,y-8)});if(camPts.length===4){ctx.beginPath();camPts.forEach(([px,py],i)=>i?ctx.lineTo(px*mx,py*mx):ctx.moveTo(px*mx,py*mx));ctx.closePath();ctx.stroke()}c.onclick=e=>{const r=c.getBoundingClientRect();const x=(e.clientX-r.left)*photo.width/r.width,y=(e.clientY-r.top)*photo.height/r.height;if(camPts.length>=4)camPts=[];camPts.push([x,y]);updateCamView()};help.textContent=camPts.length===4?'✓ Đã đặt 4 góc — sẵn sàng đọc ô tô':'Chạm mốc số '+(camPts.length+1)+'/4 — '+['trên trái','trên phải','dưới phải','dưới trái'][camPts.length];read.disabled=camPts.length!==4;reset.disabled=camPts.length===0}
 else{help.textContent=camStream?'Camera đang mở': 'Chưa chọn ảnh';read.disabled=true;reset.disabled=true;const snap=document.getElementById('btn-snap');if(snap)snap.disabled=!camStream;}}
-function initFile(file){if(!file)return;const uri=URL.createObjectURL(file),img=new Image();img.onload=()=>{stopCam();photo=img;camPts=[];camRead=null;scanToken++;ocrState={status:'',raw:'',confidence:0,candidates:[],preview:'',note:''};updateCamView();document.getElementById('omr-message').textContent='Ảnh đã tải. Chạm bốn góc để căn chỉnh.';URL.revokeObjectURL(uri)};img.onerror=()=>toast('Không đọc được ảnh đã chọn');img.src=uri}
-function stopCam(){if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null}}
-async function startCam(){if(!navigator.mediaDevices?.getUserMedia){toast('Trình duyệt không hỗ trợ camera trực tiếp. Hãy dùng nút Chụp / tải ảnh.');return}try{stopCam();camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});photo=null;camPts=[];scanToken++;ocrState={status:'',raw:'',confidence:0,candidates:[],preview:'',note:''};const box=document.getElementById('cam-box');box.innerHTML='<video autoplay muted playsinline id="live-video"></video>';document.getElementById('live-video').srcObject=camStream;document.getElementById('btn-snap').disabled=false;updateCamView()}catch(err){toast('Không bật được camera. Hãy cho phép truy cập hoặc dùng nút Chụp / tải ảnh.')}}
-function snapCam(){const video=document.getElementById('live-video');if(!video||!video.videoWidth){toast('Camera chưa sẵn sàng');return}const c=document.createElement('canvas');c.width=video.videoWidth;c.height=video.videoHeight;c.getContext('2d').drawImage(video,0,0);const img=new Image();img.onload=()=>{photo=img;camPts=[];scanToken++;ocrState={status:'',raw:'',confidence:0,candidates:[],preview:'',note:''};stopCam();updateCamView()};img.src=c.toDataURL('image/jpeg',.94)}
+function setCameraHint(message,ok=false){
+ const el=document.getElementById('live-instruction');if(el){el.textContent=message;el.classList.toggle('ok',ok)}
+}
+function autoFindCorners(source){
+ if(!window.SmartOMRDetect?.find)return {ok:false,reason:'Thiếu mô-đun nhận dạng mốc: kiểm tra file js/omr-auto.js trên Vercel'};
+ try{return window.SmartOMRDetect.find(source)}catch(e){return {ok:false,reason:String(e.message||e)}}
+}
+function acceptImage(img,fromAuto=false){
+ stopCam();photo=img;camPts=[];camRead=null;scanToken++;
+ ocrState={status:'',raw:'',confidence:0,candidates:[],preview:'',note:''};
+ const detection=autoFindCorners(img);
+ if(detection.ok){
+  camPts=detection.points;updateCamView();
+  const q=window.SmartOMRDetect?.quality?.(img,camPts);
+  if(q&&!q.ok){
+   const message='⚠ Ảnh chưa đủ chất lượng: '+q.reason+'. Hãy chụp lại để chấm chính xác; vẫn có thể bấm Đọc ảnh nếu muốn kiểm tra thủ công.';
+   const note=document.getElementById('omr-message');if(note)note.textContent=message;
+   setCameraHint(message);return;
+  }
+  const note=document.getElementById('omr-message');if(note)note.textContent='✓ Đã tự nhận 4 góc. Đang đọc phiếu và chấm tạm tính…';
+  setCameraHint('✓ Tự nhận dạng 4 góc thành công',true);
+  readPhoto();return;
+ }
+ updateCamView();
+ const note=document.getElementById('omr-message');
+ if(note)note.textContent='Chưa tự tìm được 4 mốc: '+detection.reason+'. Hãy chạm lần lượt 4 mốc trên ảnh để đọc thủ công.';
+ setCameraHint('Chưa tự nhận dạng: '+detection.reason);
+ if(fromAuto)toast('Chưa đọc được mốc phiếu. Có thể chọn thủ công trên ảnh.');
+}
+function initFile(file){if(!file)return;
+ const uri=URL.createObjectURL(file),img=new Image();
+ img.onload=()=>{acceptImage(img);URL.revokeObjectURL(uri)};
+ img.onerror=()=>{URL.revokeObjectURL(uri);toast('Không mở được ảnh đã chọn')};
+ img.src=uri;
+}
+function stopCam(){
+ if(autoCamTimer){clearInterval(autoCamTimer);autoCamTimer=null}
+ autoStable=0;autoLastPoints=null;autoCamBusy=false;
+ if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null}torchEnabled=false;
+}
+function drawLiveOutline(points,video){
+ const el=document.getElementById('live-overlay'),box=document.getElementById('cam-box');if(!el||!box)return;
+ const rect=box.getBoundingClientRect();el.width=Math.max(1,Math.round(rect.width));el.height=Math.max(1,Math.round(rect.height));
+ const ctx=el.getContext('2d');ctx.clearRect(0,0,el.width,el.height);
+ if(!points)return;
+ const ratio=Math.min(el.width/video.videoWidth,el.height/video.videoHeight);
+ const offx=(el.width-video.videoWidth*ratio)/2,offy=(el.height-video.videoHeight*ratio)/2;
+ ctx.lineWidth=3;ctx.strokeStyle='#14f8bb';ctx.fillStyle='#14f8bb';ctx.beginPath();
+ points.forEach(([x,y],i)=>{const px=x*ratio+offx,py=y*ratio+offy;
+  if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+ });ctx.closePath();ctx.stroke();
+ points.forEach(([x,y])=>{ctx.beginPath();ctx.arc(x*ratio+offx,y*ratio+offy,6,0,2*Math.PI);ctx.fill()});
+}
+function captureLiveFrame(){
+ const video=document.getElementById('live-video');
+ if(!video||!video.videoWidth){setCameraHint('Camera đang lấy nét, chưa có hình ảnh');return}
+ if(autoCaptureBusy)return;
+ autoCaptureBusy=true;
+ const canvas=document.createElement('canvas');canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+ canvas.getContext('2d').drawImage(video,0,0);
+ // High-resolution image for bubble centers, avoid keeping thousands of video frames in memory.
+ const img=new Image();img.onload=()=>{autoCaptureBusy=false;acceptImage(img,true)};
+ img.onerror=()=>{autoCaptureBusy=false;setCameraHint('Không chụp được khung hình. Hãy thử lại.')};
+ img.src=canvas.toDataURL('image/jpeg',.94);
+}
+function scanLiveFrame(){
+ if(autoCamBusy||autoCaptureBusy||!camStream||tab!=='camera')return;
+ const video=document.getElementById('live-video');if(!video||video.readyState<2||!video.videoWidth)return;
+ autoCamBusy=true;
+ try{
+  const r=autoFindCorners(video);
+  if(!r.ok){autoStable=0;autoLastPoints=null;drawLiveOutline(null,video);setCameraHint('Đang tìm 4 mốc đen • '+r.reason);return}
+  drawLiveOutline(r.points,video);
+  const quality=window.SmartOMRDetect?.quality?.(video,r.points);
+  if(quality&&!quality.ok){autoStable=0;autoLastPoints=null;setCameraHint('⚠ '+quality.reason+' (độ nét: '+quality.sharpness+')');return}
+  // Stable location across 3 separate frames prevents capture during hand movement.
+  const tolerance=Math.min(video.videoWidth,video.videoHeight)*.018;
+  const similar=autoLastPoints&&r.points.every(([x,y],i)=>Math.hypot(x-autoLastPoints[i][0],y-autoLastPoints[i][1])<tolerance);
+  autoStable=similar?autoStable+1:1;autoLastPoints=r.points;
+  if(autoStable>=3){setCameraHint('✓ 4 mốc ổn định, độ nét '+(quality?.sharpness??'đạt')+' • đang chụp phiếu…',true);captureLiveFrame()}
+  else setCameraHint('✓ Đủ 4 mốc, ảnh rõ • giữ yên thêm '+(3-autoStable)+' nhịp…',true);
+ }catch(e){setCameraHint('Lỗi quét: '+String(e.message||e));autoStable=0}
+ finally{autoCamBusy=false}
+}
+async function toggleTorch(){
+ const track=camStream?.getVideoTracks?.()[0];
+ if(!track||!track.getCapabilities?.().torch){toast('Camera này không hỗ trợ đèn flash điều khiển từ web.');return}
+ try{
+  torchEnabled=!torchEnabled;
+  await track.applyConstraints({advanced:[{torch:torchEnabled}]});
+  const btn=document.getElementById('btn-torch');if(btn)btn.textContent=torchEnabled?'💡 Tắt đèn':'💡 Bật đèn';
+ }catch(e){torchEnabled=false;toast('Không bật được đèn. Hãy dùng thêm ánh sáng ngoài.');}
+}
+
+async function startCam(){
+ if(!navigator.mediaDevices?.getUserMedia){
+  const message=window.isSecureContext?'Trình duyệt này chưa hỗ trợ camera trực tiếp.':'Camera bị chặn vì trang không chạy qua HTTPS.';
+  setCameraHint(message);toast(message+' Hãy dùng ảnh phiếu.');return;
+ }
+ try{
+  stopCam();
+  camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
+  if(tab!=='camera'){stopCam();return}
+  const track=camStream.getVideoTracks()[0];
+  try{
+   const caps=track.getCapabilities?.()||{};
+   const advanced={};
+   if(caps.focusMode?.includes?.('continuous'))advanced.focusMode='continuous';
+   if(caps.exposureMode?.includes?.('continuous'))advanced.exposureMode='continuous';
+   if(Object.keys(advanced).length)await track.applyConstraints({advanced:[advanced]});
+  }catch(ignore){/* Một số điện thoại không hỗ trợ focus/exposure constraints. */}
+  photo=null;camPts=[];scanToken++;ocrState={status:'',raw:'',confidence:0,candidates:[],preview:'',note:''};
+  const box=document.getElementById('cam-box');
+  box.innerHTML='<video autoplay muted playsinline class="live-video" id="live-video"></video><canvas class="live-overlay" id="live-overlay"></canvas>';
+  const video=document.getElementById('live-video');video.srcObject=camStream;
+  try{await video.play()}catch(e){throw Error('Trình duyệt không phát được hình ảnh camera: '+e.message)}
+  document.getElementById('btn-snap').disabled=false;
+  const torchBtn=document.getElementById('btn-torch');if(torchBtn)torchBtn.hidden=!Boolean(camStream.getVideoTracks()[0]?.getCapabilities?.().torch);
+  setCameraHint('Camera đã mở • đưa trọn tờ phiếu vào khung hình và giữ yên');
+  updateCamView();
+  autoCamTimer=setInterval(scanLiveFrame,650);scanLiveFrame();
+ }catch(err){stopCam();let detail=String(err.name||'')+': '+String(err.message||err);
+  if(err.name==='NotAllowedError')detail='Bạn chưa cấp quyền camera. Hãy cho phép camera trong trình duyệt và thử lại.';
+  else if(err.name==='NotFoundError')detail='Không tìm thấy camera trên thiết bị.';
+  else if(err.name==='NotReadableError')detail='Camera đang bị ứng dụng khác sử dụng.';
+  setCameraHint(detail);toast('Không mở được camera: '+detail);
+ }
+}
+function snapCam(){captureLiveFrame()}
 // Project template coordinates (768 x 1097) onto photographed paper, using four manually selected registration squares.
 function perspective(){const pts=[[25,20],[747,20],[747,1064],[25,1064]];let A=[],B=[];pts.forEach(([x,y],i)=>{const [u,v]=camPts[i];A.push([x,y,1,0,0,0,-u*x,-u*y]);B.push(u);A.push([0,0,0,x,y,1,-v*x,-v*y]);B.push(v)});for(let k=0;k<8;k++){let best=k;for(let j=k+1;j<8;j++)if(Math.abs(A[j][k])>Math.abs(A[best][k]))best=j;[A[k],A[best]]=[A[best],A[k]];[B[k],B[best]]=[B[best],B[k]];if(Math.abs(A[k][k])<1e-10)throw Error('Không hiệu chỉnh được 4 điểm, hãy chọn lại');const div=A[k][k];for(let j=k;j<8;j++)A[k][j]/=div;B[k]/=div;for(let i=0;i<8;i++){if(i===k)continue;const t=A[i][k];for(let j=k;j<8;j++)A[i][j]-=t*A[k][j];B[i]-=t*B[k]}}return (x,y)=>{const z=B[6]*x+B[7]*y+1;return [(B[0]*x+B[1]*y+B[2])/z,(B[3]*x+B[4]*y+B[5])/z]}}
-function sampleFactory(map){const cnv=document.createElement('canvas');cnv.width=photo.width;cnv.height=photo.height;const ctx=cnv.getContext('2d',{willReadFrequently:true});ctx.drawImage(photo,0,0);const {data:px,width:w,height:h}=ctx.getImageData(0,0,cnv.width,cnv.height);return (x,y)=>{let n=0,s=0;for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){const [u,v]=map(x+dx*.6,y+dy*.6),xi=Math.round(u),yi=Math.round(v);if(xi<0||yi<0||xi>=w||yi>=h)continue;const k=(yi*w+xi)*4;const lum=.299*px[k]+.587*px[k+1]+.114*px[k+2];s+=Math.max(0,1-lum/255);n++}return n?s/n:0}}
+function sampleFactory(map){
+ // Adaptive local background subtraction: removes uneven exposure / shadows.
+ // The bubble center is compared with nearby white paper in the SAME region.
+ const cnv=document.createElement('canvas');cnv.width=photo.width;cnv.height=photo.height;
+ const ctx=cnv.getContext('2d',{willReadFrequently:true});ctx.drawImage(photo,0,0);
+ const {data:px,width:w,height:h}=ctx.getImageData(0,0,cnv.width,cnv.height);
+ function luminance(x,y){
+  const [u,v]=map(x,y),xi=Math.round(u),yi=Math.round(v);
+  if(xi<0||yi<0||xi>=w||yi>=h)return null;
+  const k=(yi*w+xi)*4;return .299*px[k]+.587*px[k+1]+.114*px[k+2];
+ }
+ return (x,y)=>{
+  let center=0,ct=0,background=0,bt=0;
+  for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+   const v=luminance(x+dx*.7,y+dy*.7);
+   if(v!==null){center+=v;ct++}
+  }
+  for(const [dx,dy] of [[-8,-8],[8,-8],[-8,8],[8,8],[-9,0],[9,0]]){
+   const v=luminance(x+dx,y+dy);
+   if(v!==null){background+=v;bt++}
+  }
+  if(!ct||!bt)return 0;
+  const ink=(background/bt-center/ct)/Math.max(90,background/bt);
+  return Math.max(0,Math.min(1,ink));
+ };
+}
 function chooseBubble(scores,labels){let sorted=scores.map((s,i)=>({i,s})).sort((a,b)=>b.s-a.s),top=sorted[0],second=sorted[1];if(!top||top.s<.34)return {answer:'',status:'trống',confidence:top?.s||0};if(second&&second.s>.33&&top.s-second.s<.14)return {answer:'',status:'tô nhiều/khó đọc',confidence:top.s};return {answer:labels[top.i],status:top.s<.45?'mờ':'đã đọc',confidence:top.s}}
 function readPhoto(){try{if(!photo||camPts.length!==4)return;const map=perspective(),s=sampleFactory(map);let cnt=0,uncertain=0;const coords1=[[83,114,145,175],[256,287,319,349],[429,460,490,521],[602,633,664,695]];for(let q=0;q<data.counts.one;q++){const group=Math.floor(q/10),row=q%10;const rr=chooseBubble(coords1[group].map(x=>s(x,403+row*17.96)),['A','B','C','D']);data.responses.one[q]=rr.answer;if(rr.status!=='đã đọc')uncertain++;if(rr.answer)cnt++}
 const coords2=[[84,114],[145,175],[256,287],[319,349],[429,460],[490,521],[602,633],[664,695]];for(let q=0;q<data.counts.two;q++){data.responses.two[q]=[0,1,2,3].map(j=>{const rr=chooseBubble(coords2[q].map(x=>s(x,662+j*18.5)),['Đ','S']);if(rr.status!=='đã đọc')uncertain++;if(rr.answer)cnt++;return rr.answer})}
-// Short-answer bubbles have multiple columns, sign and decimal marker: require human verification before scoring.
-let suspects=[];for(let q=0;q<data.counts.three;q++){const first=[79,190,302,413,525,636][q],digits=Array.from({length:4},(_,i)=>first+i*19),guess=[];for(let d=0;d<4;d++){const rr=chooseBubble(Array.from({length:10},(_,k)=>s(digits[d],842+k*20.8)),Array.from({length:10},(_,k)=>String(k)));guess.push(rr.answer)}const isMinus=s(first,802)>.38;const hasDecimal=s(first+19,821)>.38||s(first+38,821)>.38;const candidate=(isMinus?'-':'')+guess.filter(Boolean).join('')+(hasDecimal?' (có dấu phẩy)':'');suspects.push(`Câu ${q+1}: ${candidate||'không rõ'}`)}
+// Phần III: đọc số tô từ trái qua phải; đánh dấu những dòng không đủ độ tin cậy.
+// Dấu phẩy được tô ở cột đứng ngay sau phần nguyên; dấu '-' ở cột đầu.
+let suspects=[],numericRead=[];
+for(let q=0;q<data.counts.three;q++){
+ const first=[79,190,302,413,525,636][q];
+ const digitXs=Array.from({length:4},(_,i)=>first+i*19);
+ const marks=digitXs.map(x=>chooseBubble(Array.from({length:10},(_,k)=>s(x,842+k*20.8)),Array.from({length:10},(_,k)=>String(k))));
+ const rawDigits=marks.map(m=>m.answer),used=rawDigits.filter(Boolean).length;
+ const filled=rawDigits.slice(0,used).every(Boolean),clear=marks.slice(0,used).every(m=>m.status==='đã đọc');
+ const minus=s(first,802)>.52;
+ const commaCandidates=[1,2,3].filter(i=>s(digitXs[i],821)>.52);
+ let note='',answer='';
+ if(!used)note='Chưa tô chữ số';
+ else if(!filled)note='Có cột trống ở giữa các chữ số';
+ else if(!clear)note='Một hoặc nhiều chữ số tô mờ';
+ else if(commaCandidates.length>1)note='Tô nhiều dấu phẩy';
+ else if(commaCandidates.length===1&&commaCandidates[0]>=used)note='Dấu phẩy nằm ngoài số đã tô';
+ else{
+  const parts=rawDigits.slice(0,used);
+  if(commaCandidates.length===1)parts.splice(commaCandidates[0],0,',');
+  answer=(minus?'-':'')+parts.join('');
+ }
+ if(note)uncertain++;
+ else{numericRead[q]=answer;cnt++}
+ suspects.push(`Câu ${q+1}: ${answer||'chưa chắc chắn'}${note?' — '+note:''}`);
+}
 const sbdCols=[537,552,567,582,598,613,628,643],codeCols=[674,689,704,719];
 const readDigits=arr=>{const parts=arr.map(x=>chooseBubble(Array.from({length:10},(_,j)=>s(x,124+j*21.2)),Array.from({length:10},(_,j)=>String(j))));return {value:parts.every(p=>p.answer&&p.status==='đã đọc')?parts.map(p=>p.answer).join(''):'',ambiguous:parts.filter(p=>p.status!=='đã đọc').length}};
 const sbdInfo=readDigits(sbdCols),codeInfo=readDigits(codeCols);
 const sbd=sbdInfo.value,code=codeInfo.value;
-data.student={sbd,name:'',code,lop:'',source:''};if(sbd&&matchStudent())data.student.source='sbd';
-data.responses.three=Array(maxima.three).fill('');save();
-camRead={cnt,uncertain:uncertain+sbdInfo.ambiguous+codeInfo.ambiguous,suspects,sbdInfo,codeInfo};
-tab='grade';gradeSection='one';ocrState={status:'',raw:'',confidence:0,candidates:[],preview:'',note:''};render();window.scrollTo({top:0,behavior:'auto'});recognizeVietnameseName();
+const effectiveCode=code||(codes().length===1?codes()[0]:'');
+if(effectiveCode)setActiveCode(effectiveCode); // Không được chấm tạm bằng đáp án của mã đề khác nếu mã mới chưa có trên Sheets.
+data.student={sbd,name:'',code:effectiveCode,lop:'',source:''};if(sbd&&matchStudent())data.student.source='sbd';
+data.responses.three=Array(maxima.three).fill('');numericRead.forEach((x,i)=>{if(x)data.responses.three[i]=x});save();
+camRead={cnt,uncertain:uncertain,optionalIdentityUnclear:sbdInfo.ambiguous+codeInfo.ambiguous,suspects,sbdInfo,codeInfo};
+stopCam();tab='grade';gradeSection='one';ocrState={status:'',raw:'',confidence:0,candidates:[],preview:'',note:''};render();window.scrollTo({top:0,behavior:'auto'});
 if(data.student.name)toast('Đã nhận SBD '+sbd+': '+data.student.name+'. Kiểm tra điểm rồi lưu.');
-else toast('Không nhận được học sinh từ SBD. Chỉ cần chọn tên trong danh sách để tiếp tục.');
+else toast('Đã đọc phiếu; không cần SBD hoặc họ tên để xem điểm và lưu.');
 }catch(e){toast('Không đọc được phiếu: '+e.message)}}
 function missingAnswerCount(){let missing=0;for(let i=0;i<data.counts.one;i++)if(!'ABCD'.includes(String(data.keys.one[i]||' ')))missing++;
 for(let i=0;i<data.counts.two;i++){const row=data.keys.two[i]||[];for(let j=0;j<4;j++)if(!['Đ','S'].includes(row[j]))missing++;}
 for(let i=0;i<data.counts.three;i++)if(!String(data.keys.three[i]||'').trim())missing++;
 return missing;}
-function saveResult(){
- const missing=missingAnswerCount();if(missing){toast('Còn '+missing+' đáp án chuẩn chưa thiết lập. Mở mục Đáp án chuẩn trước khi lưu điểm.');return false;}
- if(strongNameMismatch()&&!ocrState.mismatchReviewed){toast('Tên trên phiếu và tên theo SBD không khớp. Vui lòng xác nhận trước khi lưu.');return false;}
- const r=data.roster.find(x=>String(x.sbd)===String(data.student.sbd));
- if(!r){toast('Chưa xác định học sinh. Hãy quét rõ SBD hoặc chọn một học sinh từ danh sách.');return false;}
- data.student.name=r.name;data.student.lop=r.lop||'';
- const g=grading(),t=new Date(),entry={at:t.toLocaleString('vi-VN'),name:r.name,sbd:r.sbd,code:data.student.code,scores:{one:g.one.earned,two:g.two.earned,three:g.three.earned,total:g.total,max:g.max},student:JSON.parse(JSON.stringify(data.student)),responses:JSON.parse(JSON.stringify(data.responses))};
- const same=data.history.findIndex(h=>String(h.sbd)===String(r.sbd)&&String(h.code||'')===String(entry.code||''));
- if(same>=0){if(!window.confirm(`Đã có bài chấm của ${r.name} (SBD ${r.sbd}, mã đề ${entry.code||'—'}). Ghi đè kết quả cũ?`))return false;data.history.splice(same,1)}
- data.history.unshift(entry);save();toast('Đã lưu '+entry.name+' • '+fmt(g.total)+' điểm');return true;
+async function saveResult(){
+ if(!cloudReady){toast('Chưa kết nối Google Sheets. Không thể lưu điểm.');return false;}
+ const missing=missingAnswerCount();if(missing){toast('Còn '+missing+' đáp án chuẩn chưa thiết lập cho mã '+data.activeCode+'.');return false;}
+ const rawSbd=String(data.student.sbd||'').trim();
+ if(rawSbd&&!/^\d{1,12}$/.test(rawSbd)){toast('SBD không hợp lệ. Có thể xóa SBD và lưu bình thường.');return false;}
+ const code=String(data.student.code||'');
+ if(!/^\d{4}$/.test(code)||code!==data.activeCode||!data.keysByCode[code]){
+  toast('Cần chọn mã đề có đáp án đã lưu trên Google Sheets.');return false;
+ }
+ const verified=document.getElementById('verify-third')?.checked===true;
+ if(data.counts.three>0&&!verified){toast('Hãy xác nhận đã kiểm tra Phần III trước khi lưu.');return false;}
+ const r=rawSbd?data.roster.find(x=>String(x.sbd)===rawSbd):null;
+ const name=(r?.name||String(data.student.name||'').trim()).normalize('NFC');
+ const mismatch=strongNameMismatch()&&!ocrState.mismatchReviewed;
+ const label=name||'phiếu không gắn tên';
+ if(!window.confirm(`Lưu điểm cho ${label}${rawSbd?' (SBD '+rawSbd+')':''}? ${mismatch?'CẢNH BÁO: tên OCR và SBD không khớp. ':''}Bạn đã kiểm tra các ô tô chưa rõ và Phần III?`))return false;
+ graderName=(document.getElementById('grader-display')?.value||graderName).trim()||'Giáo viên';
+ store.setItem('smartomr_grader_v2',graderName);
+ const request={examId:data.examId,code,sbd:rawSbd,name,lop:r?.lop||data.student.lop||'',paperId:data.paperId,
+   responses:structuredClone(data.responses),grader:graderName,
+   confirmed:true,partThreeVerified:verified||data.counts.three===0,source:camRead?'camera':'manual',
+   confidenceNote:camRead?'Số ô chưa chắc chắn: '+camRead.uncertain:'Giáo viên nhập/chỉnh thủ công',
+   configSnapshot:configPayload(),keysSnapshot:structuredClone(data.keys)};
+ try{
+   cloudStatus('Đang chấm lại và ghi Google Sheets...');
+   let response;
+   try{response=await api('saveResult',request);}catch(error){
+     if(error.code==='ALREADY_EXISTS'&&window.confirm(error.message+' Bạn muốn GHI ĐÈ điểm của SBD này không?')){
+       response=await api('saveResult',{...request,forceOverwrite:true});
+     }else throw error;
+   }
+   const entry=response.entry;
+   data.paperId=entry.id;
+   data.history=data.history.filter(h=>h.id!==entry.id);
+   data.history.unshift(entry);
+   cloudStatus('✓ Đã lưu '+(entry.name||'phiếu #'+entry.id.slice(-8))+' • '+fmt(entry.scores.total)+' điểm');
+   toast('Đã lưu Google Sheets: '+(entry.name||'phiếu vô danh')+' • '+fmt(entry.scores.total)+' điểm');
+   save();return true;
+ }catch(error){cloudStatus(error.message,true);toast('CHƯA LƯU: '+error.message);return false;}
 }
-function exportHistory(){if(!data.history.length){toast('Chưa có kết quả để xuất');return}const rows=[['Thời gian','Họ và tên','Số báo danh','Mã đề','Điểm phần I','Điểm phần II','Điểm phần III','Tổng điểm','Thang điểm'],...data.history.map(h=>[h.at,h.name,h.sbd,h.code,h.scores.one,h.scores.two,h.scores.three,h.scores.total,h.scores.max])];const csv='\ufeff'+rows.map(row=>row.map(x=>'"'+String(x??'').replaceAll('"','""')+'"').join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Bang_diem_SmartOMR.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200)}
+
+function exportHistory(){if(!data.history.length){toast('Chưa có kết quả để xuất');return}const rows=[['Mã phiếu','Thời gian','Họ và tên','Số báo danh','Mã đề','Điểm phần I','Điểm phần II','Điểm phần III','Tổng điểm','Thang điểm'],...data.history.map(h=>[h.id,h.at,h.name,h.sbd,h.code,h.scores.one,h.scores.two,h.scores.three,h.scores.total,h.scores.max])];const csv='\ufeff'+rows.map(row=>row.map(x=>'"'+String(x??'').replaceAll('"','""')+'"').join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Bang_diem_SmartOMR.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200)}
 function backupAll(){const content=JSON.stringify({app:'SmartOMR',version:'1.0',date:new Date().toISOString(),data},null,2);
 const blob=new Blob([content],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='SmartOMR_SaoLuu_'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1800);toast('Đã tạo tệp sao lưu; kiểm tra thư mục tải xuống.');}
 function validBackupData(d){if(!d||typeof d!=='object'||!d.counts||!d.keys||!d.weights||!d.responses||!d.student)return false;
@@ -313,16 +675,26 @@ try{const parsed=JSON.parse(String(reader.result));if(parsed.app!=='SmartOMR'||!
 if(!confirm('Khôi phục sẽ thay thế toàn bộ danh sách, đáp án và bảng điểm đang lưu trên trình duyệt này. Tiếp tục?'))return;
 stopCam();photo=null;camRead=null;camPts=[];ocrState={status:'',raw:'',confidence:0,candidates:[],preview:'',note:''};data=parsed.data;save();tab='history';render();toast('Đã khôi phục '+data.history.length+' bài chấm và '+data.roster.length+' học sinh.');
 }catch(error){toast('Không khôi phục được: '+error.message);}};reader.readAsText(file,'utf-8');}
-function onClick(e){const target=e.target.closest('[data-tab],[data-act],[data-grade-section],[data-cfg-section],[data-key-section],[data-res-one],[data-res-two],[data-key-one],[data-key-two]');if(!target)return;
-if(target.dataset.tab){if(target.tagName==='A')e.preventDefault();if(tab==='camera'&&target.dataset.tab!=='camera')stopCam();tab=target.dataset.tab;render();return}
+async function onClick(e){const target=e.target.closest('[data-tab],[data-act],[data-grade-section],[data-cfg-section],[data-key-section],[data-res-one],[data-res-two],[data-key-one],[data-key-two]');if(!target)return;
+if(target.dataset.tab){if(target.tagName==='A')e.preventDefault();if(tab==='camera'&&target.dataset.tab!=='camera')stopCam();tab=target.dataset.tab;render();if(tab==='camera')startCam();return}
 if(target.dataset.gradeSection){gradeSection=target.dataset.gradeSection;rerenderGradeQuestions();document.querySelectorAll('[data-grade-section]').forEach(b=>b.classList.toggle('active',b.dataset.gradeSection===gradeSection));return}
 if(target.dataset.cfgSection){section=target.dataset.cfgSection;document.getElementById('weight-rows').innerHTML=weightRows(section);document.querySelectorAll('[data-cfg-section]').forEach(b=>b.classList.toggle('active',b.dataset.cfgSection===section));return}
 if(target.dataset.keySection){keySection=target.dataset.keySection;document.getElementById('key-rows').innerHTML=keyRows(keySection);document.querySelectorAll('[data-key-section]').forEach(b=>b.classList.toggle('active',b.dataset.keySection===keySection));return}
 if(target.dataset.resOne!==undefined){const i=Number(target.dataset.resOne),a=target.dataset.a;data.responses.one[i]=data.responses.one[i]===a?'':a;save();rerenderGradeQuestions();return}
 if(target.dataset.resTwo!==undefined){const i=Number(target.dataset.resTwo),j=Number(target.dataset.sub),a=target.dataset.a;data.responses.two[i][j]=data.responses.two[i][j]===a?'':a;save();rerenderGradeQuestions();return}
-if(target.dataset.keyOne!==undefined){data.keys.one[Number(target.dataset.keyOne)]=target.dataset.a;save();rerenderKeys();return}
-if(target.dataset.keyTwo!==undefined){data.keys.two[Number(target.dataset.keyTwo)][Number(target.dataset.sub)]=target.dataset.a;save();rerenderKeys();return}
+if(target.dataset.keyOne!==undefined){data.keys.one[Number(target.dataset.keyOne)]=target.dataset.a;save();dirtyCloud('Đáp án');rerenderKeys();return}
+if(target.dataset.keyTwo!==undefined){data.keys.two[Number(target.dataset.keyTwo)][Number(target.dataset.sub)]=target.dataset.a;save();dirtyCloud('Đáp án');rerenderKeys();return}
 const act=target.dataset.act;
+if(['sync-config','sync-keys','sync-roster'].includes(act)){
+ if(cloudBusy)return;cloudBusy=true;target.disabled=true;
+ try{if(act==='sync-config')await cloudSaveConfig();else if(act==='sync-keys')await cloudSaveKeys();else await cloudSaveRoster();}
+ catch(e){cloudStatus('Chưa lưu: '+e.message,true);toast('CHƯA LƯU: '+e.message);}finally{cloudBusy=false;target.disabled=false;}
+ return;
+}
+if(act==='create-code'){
+ try{const c=document.getElementById('new-code').value.trim();setActiveCode(c);screenKeys();dirtyCloud('Đáp án mã đề mới');toast('Mã đề '+c+' (chưa lưu lên Sheets)');}
+ catch(e){toast(e.message);}return;
+}
 if(act==='confirm-ocr'){
  const picked=data.roster.find(r=>String(r.sbd)===String(target.dataset.sbd));
  if(!picked){toast('Không tìm thấy học sinh trong danh sách.');return;}
@@ -331,18 +703,24 @@ if(act==='confirm-ocr'){
 }
 if(act==='confirm-sbd'){ocrState.mismatchReviewed=true;ocrPanelUpdate();toast('Đã xác nhận theo SBD. Có thể lưu bảng điểm.');return;}
 if(act==='retry-ocr'){recognizeVietnameseName();return;}
-if(act==='save-grade')saveResult();else if(act==='save-next'){if(saveResult())newPaper(true)}else if(act==='new-paper')newPaper();else if(act==='clear'){data.responses=emptyResponses();save();render();toast('Đã xóa đáp án bài làm hiện tại')}else if(act==='sample'){data.responses=JSON.parse(JSON.stringify(seed.responses));save();render();toast('Đã nạp bài làm minh họa')}else if(act==='sample-keys'){data.keys=JSON.parse(JSON.stringify(seed.keys));save();render();toast('Đã khôi phục đáp án mẫu')}else if(act==='distribute'){const p=target.dataset.part,count=data.counts[p],f=document.querySelector(`[data-total="${p}"]`),total=Math.max(0,num(f.value));if(!count){toast('Phần này chưa có câu hỏi');return}for(let i=0;i<count;i++)data.weights[p][i]=total/count;save();render();toast(`Đã chia ${fmt(total)} điểm cho ${count} câu của ${names[p]}`)}else if(act==='add-student'){const sbd=document.getElementById('roster-sbd').value.trim(),name=document.getElementById('roster-name').value.trim().normalize('NFC'),lop=document.getElementById('roster-class').value.trim();if(!sbd||!name){toast('Cần nhập SBD và họ tên');return}const prev=data.roster.find(x=>x.sbd===sbd);if(prev){prev.name=name;prev.lop=lop}else data.roster.push({sbd,name,lop});save();screenStudents();toast('Đã lưu học sinh: '+name)}else if(act==='remove-student'){data.roster.splice(Number(target.dataset.index),1);save();screenStudents()}else if(act==='sample-roster'){data.roster=JSON.parse(JSON.stringify(seed.roster));save();screenStudents();toast('Đã nạp danh sách học sinh mẫu')}else if(act==='export')exportHistory();else if(act==='backup')backupAll();else if(act==='load-history'){const h=data.history[Number(target.dataset.index)];data.student=JSON.parse(JSON.stringify(h.student));data.responses=JSON.parse(JSON.stringify(h.responses));tab='grade';save();render()}else if(act==='start-cam')startCam();else if(act==='snap')snapCam();else if(act==='reset-corners'){camPts=[];updateCamView()}else if(act==='read-photo')readPhoto();else if(act==='goto-grade'){tab='grade';render()}}
+if(act==='save-grade')await saveResult();else if(act==='save-next'){if(await saveResult())newPaper(true)}else if(act==='new-paper')newPaper();else if(act==='clear'){data.responses=emptyResponses();save();render();toast('Đã xóa đáp án bài làm hiện tại')}else if(act==='sample'){data.responses=JSON.parse(JSON.stringify(seed.responses));save();render();toast('Đã nạp bài làm minh họa')}else if(act==='sample-keys'){data.keys=JSON.parse(JSON.stringify(seed.keys));save();render();toast('Đã khôi phục đáp án mẫu')}else if(act==='distribute'){const p=target.dataset.part,count=data.counts[p],f=document.querySelector(`[data-total="${p}"]`),total=Math.max(0,num(f.value));if(!count){toast('Phần này chưa có câu hỏi');return}for(let i=0;i<count;i++)data.weights[p][i]=total/count;save();render();dirtyCloud('Cấu hình');toast(`Đã chia ${fmt(total)} điểm cho ${count} câu của ${names[p]}`)}else if(act==='add-student'){const sbd=document.getElementById('roster-sbd').value.trim(),name=document.getElementById('roster-name').value.trim().normalize('NFC'),lop=document.getElementById('roster-class').value.trim();if(!sbd||!name){toast('Cần nhập SBD và họ tên');return}const prev=data.roster.find(x=>x.sbd===sbd);if(prev){prev.name=name;prev.lop=lop}else data.roster.push({sbd,name,lop});save();screenStudents();dirtyCloud('Danh sách');toast('Đã lưu học sinh: '+name)}else if(act==='remove-student'){data.roster.splice(Number(target.dataset.index),1);save();screenStudents();dirtyCloud('Danh sách')}else if(act==='sample-roster'){data.roster=JSON.parse(JSON.stringify(seed.roster));save();screenStudents();toast('Đã nạp danh sách học sinh mẫu')}else if(act==='export')exportHistory();else if(act==='backup')backupAll();else if(act==='load-history'){const h=data.history[Number(target.dataset.index)];data.paperId=h.id||newPaperId();data.student=JSON.parse(JSON.stringify(h.student));data.responses=JSON.parse(JSON.stringify(h.responses));tab='grade';save();render()}else if(act==='start-cam')startCam();else if(act==='snap')snapCam();else if(act==='torch')toggleTorch();else if(act==='reset-corners'){camPts=[];updateCamView()}else if(act==='read-photo')readPhoto();else if(act==='goto-grade'){tab='grade';render()}}
 function onChange(e){const t=e.target,d=t.dataset;
+if(t.id==='grade-code'||t.id==='key-code-select'){
+ try{setActiveCode(t.value);render();}catch(e){toast(e.message);}return;
+}
 if(t.id==='student-picker'){
- const r=data.roster.find(x=>x.sbd===t.value);data.student.sbd=r?r.sbd:'';matchStudent();data.student.source=r?'manual':'';save();updateIdentity();return;
+ const r=data.roster.find(x=>x.sbd===t.value);data.student.sbd=r?r.sbd:'';matchStudent();data.student.code=data.activeCode;data.student.source=r?'manual':'';save();updateIdentity();return;
 }
 if(t.id==='student-search'){
  const picker=document.getElementById('student-picker');if(picker)picker.innerHTML=studentOptions(t.value);return;
 }
-if(d.student!==undefined){data.student[d.student]=t.value;if(d.student==='sbd'&&matchStudent()){const name=document.querySelector('[data-student="name"]');if(name)name.value=data.student.name;}save();updateSummary()}else if(d.resThree!==undefined){data.responses.three[Number(d.resThree)]=t.value;save();updateSummary();const parent=t.closest('.qbox');if(parent){const x=grading().three.details[Number(d.resThree)],label=parent.querySelector('.qscore'),status=parent.querySelector('.small');if(label)label.textContent=fmt(x.earned)+' / '+fmt(x.max);if(status){status.textContent=x.ok?'✓ Đúng':'Đáp án: '+data.keys.three[Number(d.resThree)];status.style.color=x.ok?'#148a65':'#8794a6'}}}
-else if(d.keyThree!==undefined){data.keys.three[Number(d.keyThree)]=t.value;save()}else if(d.weight!==undefined){data.weights[d.weight][Number(d.idx)]=Math.max(0,num(t.value));save();const total=Array.from(document.querySelectorAll('.summary-strip span')).at(-1);if(total)total.textContent=fmt(allMax())+' điểm'}else if(d.count!==undefined){const p=d.count,c=Math.min(maxima[p],Math.max(0,Math.trunc(num(t.value))));data.counts[p]=c;save();screenConfig();toast(`Đã đặt ${names[p]}: ${c} câu`)}else if(d.scale!==undefined){data.scoreScale[Number(d.scale)]=Math.min(1,Math.max(0,num(t.value)));save()}else if(t.id==='file-photo'){initFile(t.files[0])}else if(t.id==='roster-file'){importRoster(t.files[0])}else if(t.id==='backup-file'){restoreAll(t.files[0])}}
+if(d.student!==undefined){data.student[d.student]=t.value;if(d.student==='sbd'&&matchStudent()){const name=document.querySelector('[data-student="name"]');if(name)name.value=data.student.name;}save();updateIdentity()}else if(d.resThree!==undefined){data.responses.three[Number(d.resThree)]=t.value;save();updateSummary();const parent=t.closest('.qbox');if(parent){const x=grading().three.details[Number(d.resThree)],label=parent.querySelector('.qscore'),status=parent.querySelector('.small');if(label)label.textContent=fmt(x.earned)+' / '+fmt(x.max);if(status){status.textContent=x.ok?'✓ Đúng':'Đáp án: '+data.keys.three[Number(d.resThree)];status.style.color=x.ok?'#148a65':'#8794a6'}}}
+else if(d.keyThree!==undefined){data.keys.three[Number(d.keyThree)]=t.value;save();dirtyCloud('Đáp án')}else if(d.weight!==undefined){data.weights[d.weight][Number(d.idx)]=Math.max(0,num(t.value));save();dirtyCloud('Cấu hình');const total=Array.from(document.querySelectorAll('.summary-strip span')).at(-1);if(total)total.textContent=fmt(allMax())+' điểm'}else if(d.count!==undefined){const p=d.count,c=Math.min(maxima[p],Math.max(0,Math.trunc(num(t.value))));data.counts[p]=c;save();screenConfig();dirtyCloud('Cấu hình');toast(`Đã đặt ${names[p]}: ${c} câu`)}else if(d.scale!==undefined){data.scoreScale[Number(d.scale)]=Math.min(1,Math.max(0,num(t.value)));save();dirtyCloud('Cấu hình')}else if(t.id==='file-photo'){initFile(t.files[0])}else if(t.id==='roster-file'){importRoster(t.files[0])}else if(t.id==='backup-file'){toast('Chế độ Google Sheets: không tự khôi phục lên máy chủ. Hãy nhập lại từng phần để tránh ghi đè dữ liệu chung.')}}
 // Total points field is a target for the "Chia đều" button; changing it does not mutate individual per-question points until clicked.
-document.addEventListener('click',onClick);document.addEventListener('input',e=>{if(e.target.matches('[data-student],[data-res-three],[data-key-three],#student-search'))onChange(e)});document.addEventListener('change',e=>{if(e.target.matches('[data-student],[data-res-three],[data-key-three],#student-search'))return;onChange(e)});window.addEventListener('beforeunload',stopCam);render();
+document.getElementById('cloud-login-form').addEventListener('submit',cloudLogin);
+document.getElementById('cloud-logout').addEventListener('click',cloudLogout);
+document.getElementById('cloud-refresh').addEventListener('click',()=>cloudRefresh().catch(e=>cloudStatus(e.message,true)));
+document.addEventListener('click',onClick);document.addEventListener('input',e=>{if(e.target.matches('[data-student],[data-res-three],[data-key-three],#student-search'))onChange(e)});document.addEventListener('change',e=>{if(e.target.matches('[data-student],[data-res-three],[data-key-three],#student-search'))return;onChange(e)});window.addEventListener('beforeunload',stopCam);render();initCloud();
 })();
 </script>
 <script>
